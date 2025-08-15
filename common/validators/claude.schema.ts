@@ -39,12 +39,14 @@ export const ClaudeContentSchema = z.union([
 ]);
 
 // 定义一个新的 System Schema 来处理字符串或文本块数组
+// 参考 claude-code-proxy 的实现：支持多个文本块并合并
 export const ClaudeSystemSchema = z
-  .union([z.string(), z.array(ClaudeTextContentSchema).max(1)])
+  .union([z.string(), z.array(ClaudeTextContentSchema)])
   .optional()
   .transform((val) => {
     if (Array.isArray(val) && val.length > 0) {
-      return val[0].text;
+      // 将多个文本块合并成一个字符串，使用双换行符分隔
+      return val.map((block) => block.text).join("\n\n");
     }
     return val;
   });
