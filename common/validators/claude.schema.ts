@@ -38,6 +38,17 @@ export const ClaudeContentSchema = z.union([
   ClaudeToolResultContentSchema,
 ]);
 
+// 定义一个新的 System Schema 来处理字符串或文本块数组
+export const ClaudeSystemSchema = z
+  .union([z.string(), z.array(ClaudeTextContentSchema).max(1)])
+  .optional()
+  .transform((val) => {
+    if (Array.isArray(val) && val.length > 0) {
+      return val[0].text;
+    }
+    return val;
+  });
+
 // Claude 消息 Schema
 export const ClaudeMessageSchema = z.object({
   role: z.enum(["user", "assistant"]),
@@ -70,7 +81,7 @@ export const ClaudeRequestSchema = z.object({
   model: z.string(),
   max_tokens: z.number().int().positive(),
   messages: z.array(ClaudeMessageSchema),
-  system: z.string().optional(),
+  system: ClaudeSystemSchema,
   temperature: z.number().min(0).max(2).optional(),
   top_p: z.number().min(0).max(1).optional(),
   top_k: z.number().int().positive().optional(),
