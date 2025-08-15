@@ -35,6 +35,7 @@ import {
   UserModelConfigSchema,
   UpdateUserConfigSchema,
 } from "../../../common/validators/config.schema";
+import { PRESET_API_PROVIDERS } from "../../../src/config/defaultModelMappings";
 
 type ProviderData = z.infer<typeof ProviderConfigSchema>;
 type ModelMappingConfig = z.infer<typeof ModelMappingConfigSchema>;
@@ -65,6 +66,7 @@ export function DashboardPage() {
   const [isFetchingModels, setIsFetchingModels] = useState(false);
   const [errors, setErrors] = useState<any>({});
   const [hasFetchedConfig, setHasFetchedConfig] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<any>(null);
 
   const isDirty = JSON.stringify({ provider, modelConfig }) !== JSON.stringify(initialState);
 
@@ -312,19 +314,47 @@ export function DashboardPage() {
           <Typography variant="h6">API 服务提供商</Typography>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12} md={6}>
-              <Box sx={{ display: "flex", gap: 1 }}>
-                <TextField
+              <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
+                <Autocomplete
+                  options={PRESET_API_PROVIDERS}
+                  getOptionLabel={(option) => (typeof option === "string" ? option : option.name)}
                   value={provider?.baseUrl || ""}
-                  onChange={(e) => setProvider((p) => ({ ...p, baseUrl: e.target.value }))}
-                  label="OpenAI 源站 Base URL"
-                  fullWidth
-                  error={!!errors.provider?.baseUrl}
-                  placeholder={errors.provider?.baseUrl?.[0] || "请输入您的API提供商Base URL，留空则使用平台默认"}
+                  onChange={(event, newValue) => {
+                    if (typeof newValue === "string") {
+                      setProvider((p) => ({ ...p, baseUrl: newValue }));
+                      setSelectedProvider(null);
+                    } else if (newValue) {
+                      setProvider((p) => ({ ...p, baseUrl: newValue.baseUrl }));
+                      setSelectedProvider(null);
+                    }
+                  }}
+                  freeSolo
+                  sx={{ flexGrow: 1 }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="OpenAI 源站 Base URL"
+                      error={!!errors.provider?.baseUrl}
+                      placeholder={errors.provider?.baseUrl?.[0] || "选择预设供应商或输入自定义地址"}
+                      fullWidth
+                    />
+                  )}
+                  renderOption={(props, option) => (
+                    <Box component="li" {...props}>
+                      <Box>
+                        <Typography variant="body2" fontWeight="medium">
+                          {option.name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {option.baseUrl}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  )}
                 />
                 {provider?.baseUrl && (
                   <Button
                     variant="outlined"
-                    size="small"
                     onClick={() => {
                       try {
                         const url = new URL(provider.baseUrl);
@@ -334,13 +364,18 @@ export function DashboardPage() {
                         console.error("Invalid URL:", error);
                       }
                     }}
-                    sx={{ minWidth: "100px" }}
+                    sx={{ minWidth: "100px", height: "56px" }}
                     title="前往源站"
                   >
                     前往源站
                   </Button>
                 )}
               </Box>
+              {selectedProvider && (
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
+                  {selectedProvider.description}
+                </Typography>
+              )}
             </Grid>
             <Grid item xs={12} md={6}>
               <TextField

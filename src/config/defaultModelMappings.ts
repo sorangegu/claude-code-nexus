@@ -16,6 +16,71 @@ export interface ModelMappingConfig {
   opus: string;
 }
 
+// 预设的API供应商配置
+export interface ApiProvider {
+  name: string;
+  baseUrl: string;
+  description: string;
+}
+
+export const PRESET_API_PROVIDERS: ApiProvider[] = [
+  {
+    name: "NekroAI 中转",
+    baseUrl: "https://api.nekro.ai/v1",
+    description: "Nekro AI 中转服务",
+  },
+  {
+    name: "谷歌Gemini",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+    description: "Google Gemini API 服务",
+  },
+  {
+    name: "通义千问",
+    baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    description: "阿里云通义千问 API 服务",
+  },
+  {
+    name: "豆包",
+    baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+    description: "字节跳动豆包 API 服务",
+  },
+  {
+    name: "Kimi",
+    baseUrl: "https://api.moonshot.cn/v1",
+    description: "月之暗面 Kimi API 服务",
+  },
+  {
+    name: "智谱清言",
+    baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+    description: "智谱AI 清言 API 服务",
+  },
+  {
+    name: "百度千帆",
+    baseUrl: "https://qianfan.baidubce.com/v2",
+    description: "百度千帆大模型 API 服务",
+  },
+  {
+    name: "科大讯飞",
+    baseUrl: "https://spark-api-open.xf-yun.com/v1",
+    description: "科大讯飞星火 API 服务",
+  },
+  {
+    name: "百川",
+    baseUrl: "https://api.baichuan-ai.com/v1",
+    description: "百川智能 API 服务",
+  },
+  {
+    name: "腾讯混元",
+    baseUrl: "https://api.hunyuan.cloud.tencent.com/v1",
+    description: "腾讯混元大模型 API 服务",
+  },
+  {
+    name: "商汤日日新",
+    baseUrl: "https://api.sensenova.cn/compatible-mode/v1",
+    description: "商汤科技日日新 API 服务",
+  },
+];
+
 // 固定的三个模型规则
 export const FIXED_MODEL_RULES: ModelMappingRule[] = [
   {
