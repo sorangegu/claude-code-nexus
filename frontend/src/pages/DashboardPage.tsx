@@ -259,6 +259,15 @@ export function DashboardPage() {
   const baseUrl = window.location.origin;
   const anthropicBaseUrl = baseUrl;
 
+  // 格式化 API Key 显示，中间部分用 * 表示
+  const formatApiKeyForDisplay = (apiKey: string) => {
+    if (!apiKey || apiKey.length <= 16) return apiKey; // 如果长度不够，直接返回
+    const prefix = apiKey.substring(0, 8);
+    const suffix = apiKey.substring(apiKey.length - 8);
+    const middle = "*".repeat(Math.max(0, apiKey.length - 16));
+    return `${prefix}${middle}${suffix}`;
+  };
+
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Typography variant="h3" component="h1" gutterBottom>
@@ -285,7 +294,9 @@ export function DashboardPage() {
               ANTHROPIC_API_KEY
             </Typography>
             <Box sx={{ display: "flex", alignItems: "center" }}>
-              <Typography sx={{ fontFamily: "monospace", flexGrow: 1 }}>{user?.apiKey}</Typography>
+              <Typography sx={{ fontFamily: "monospace", flexGrow: 1 }}>
+                {formatApiKeyForDisplay(user?.apiKey || "")}
+              </Typography>
               <IconButton onClick={() => navigator.clipboard.writeText(user?.apiKey || "")}>
                 <CopyIcon />
               </IconButton>
@@ -301,24 +312,45 @@ export function DashboardPage() {
           <Typography variant="h6">API 服务提供商</Typography>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12} md={6}>
-              <TextField
-                value={provider?.baseUrl || ""}
-                onChange={(e) => setProvider((p) => ({ ...p, baseUrl: e.target.value }))}
-                label="Base URL"
-                fullWidth
-                error={!!errors.provider?.baseUrl}
-                helperText={errors.provider?.baseUrl?.[0] || "请输入您的API提供商Base URL，留空则使用平台默认"}
-              />
+              <Box sx={{ display: "flex", gap: 1 }}>
+                <TextField
+                  value={provider?.baseUrl || ""}
+                  onChange={(e) => setProvider((p) => ({ ...p, baseUrl: e.target.value }))}
+                  label="OpenAI 源站 Base URL"
+                  fullWidth
+                  error={!!errors.provider?.baseUrl}
+                  placeholder={errors.provider?.baseUrl?.[0] || "请输入您的API提供商Base URL，留空则使用平台默认"}
+                />
+                {provider?.baseUrl && (
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => {
+                      try {
+                        const url = new URL(provider.baseUrl);
+                        const baseUrl = `${url.protocol}//${url.host}`;
+                        window.open(baseUrl, "_blank");
+                      } catch (error) {
+                        console.error("Invalid URL:", error);
+                      }
+                    }}
+                    sx={{ minWidth: "100px" }}
+                    title="前往源站"
+                  >
+                    前往源站
+                  </Button>
+                )}
+              </Box>
             </Grid>
             <Grid item xs={12} md={6}>
               <TextField
                 value={provider?.apiKey || ""}
                 onChange={(e) => setProvider((p) => ({ ...p, apiKey: e.target.value }))}
-                label="API Key"
+                label="OpenAI 源站 API Key"
                 type="password"
                 fullWidth
                 error={!!errors.provider?.apiKey}
-                helperText={errors.provider?.apiKey?.[0] || "请输入您的API密钥"}
+                placeholder={errors.provider?.apiKey?.[0] || "请输入您的API密钥"}
               />
             </Grid>
           </Grid>
@@ -330,9 +362,6 @@ export function DashboardPage() {
             <Box sx={{ display: "flex", gap: 1 }}>
               <Button onClick={fetchModels} startIcon={<CloudDownloadIcon />} disabled={isFetchingModels}>
                 {isFetchingModels ? "正在获取..." : "获取模型列表"}
-              </Button>
-              <Button onClick={resetToSystemMapping} startIcon={<RefreshIcon />} variant="outlined">
-                重置到系统默认
               </Button>
             </Box>
           </Box>
@@ -506,14 +535,22 @@ export function DashboardPage() {
               </Typography>
             </Grid>
           </Grid>
+          <Box sx={{ mt: 4, display: "flex", justifyContent: "flex-end", gap: 2 }}>
+            <Button onClick={resetToSystemMapping} startIcon={<RefreshIcon />} variant="outlined">
+              重置到系统默认
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              variant="contained"
+              size="large"
+              startIcon={<SaveIcon />}
+              disabled={!isDirty}
+            >
+              保存配置
+            </Button>
+          </Box>
         </CardContent>
       </Card>
-
-      <Box sx={{ mt: 4, display: "flex", justifyContent: "flex-end" }}>
-        <Button onClick={handleSubmit} variant="contained" size="large" startIcon={<SaveIcon />} disabled={!isDirty}>
-          保存配置
-        </Button>
-      </Box>
 
       {/* Claude Code 使用教程 */}
       <Card sx={{ mt: 4 }}>

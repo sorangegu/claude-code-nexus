@@ -34,7 +34,7 @@ export const FIXED_MODEL_RULES: ModelMappingRule[] = [
 
 // 系统默认映射配置
 export const DEFAULT_MAPPING_CONFIG: ModelMappingConfig = {
-  haiku: "gemini-2.5-flash",
+  haiku: "gemini-2.5-flash-nothinking",
   sonnet: "gemini-2.5-pro",
   opus: "gemini-2.5-pro",
 };
