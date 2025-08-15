@@ -11,6 +11,7 @@ import * as drizzleSchema from "../db/schema";
 
 type Variables = {
   db: DrizzleD1Database<typeof drizzleSchema>;
+  user?: typeof drizzleSchema.users.$inferSelect;
 };
 
 const claude = new OpenAPIHono<{ Bindings: Bindings; Variables: Variables }>();
@@ -112,17 +113,12 @@ const messagesRoute = createRoute({
 
 claude.openapi(messagesRoute, async (c) => {
   const db = c.get("db");
-  const apiKey = c.req.header("x-api-key");
   const claudeRequest = c.req.valid("json");
 
-  if (!apiKey) {
-    return c.json({ success: false, message: "Missing x-api-key header" }, 401);
-  }
-
-  // 1. Authenticate user
-  const user = await db.query.users.findFirst({ where: eq(users.apiKey, apiKey) });
+  // 1. Get user from middleware (already authenticated)
+  const user = c.get("user");
   if (!user) {
-    return c.json({ success: false, message: "Invalid API Key" }, 401);
+    return c.json({ success: false, message: "User not found in context" }, 401);
   }
 
   // 2. Find target model using the new mapping service
