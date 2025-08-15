@@ -1,12 +1,12 @@
 import { OpenAPIHono, createRoute } from "@hono/zod-openapi";
 import { eq, and, like } from "drizzle-orm";
+import { drizzle, type DrizzleD1Database } from "drizzle-orm/d1";
 import { users } from "../db/schema";
 import { ClaudeRequestSchema } from "@common/validators/claude.schema";
 import { decryptApiKey } from "../utils/encryption";
 import { convertClaudeToOpenAI, convertOpenAIToClaude, StreamConverter } from "../utils/claudeConverter";
 import { ModelMappingService } from "../services/modelMappingService";
 import type { Bindings } from "../types";
-import type { DrizzleD1Database } from "drizzle-orm/d1";
 import * as drizzleSchema from "../db/schema";
 
 type Variables = {
@@ -15,6 +15,13 @@ type Variables = {
 };
 
 const claude = new OpenAPIHono<{ Bindings: Bindings; Variables: Variables }>();
+
+// Add DB middleware to all Claude routes
+claude.use("*", async (c, next) => {
+  const db = drizzle(c.env.DB, { schema: drizzleSchema });
+  c.set("db", db);
+  await next();
+});
 
 // Claude API 兼容端点 - 消息接口
 const messagesRoute = createRoute({
@@ -111,20 +118,75 @@ const messagesRoute = createRoute({
   },
 });
 
-claude.openapi(messagesRoute, async (c) => {
+claude.openapi(messagesRoute, async (c: any) => {
   const db = c.get("db");
   const claudeRequest = c.req.valid("json");
 
-  // 1. Get user from middleware (already authenticated)
-  const user = c.get("user");
+  // 1. 通过请求头中的API key找到用户
+  // Claude Code CLI 使用 Authorization: Bearer 格式
+  const authHeader = c.req.header("authorization");
+  let userApiKey = c.req.header("x-api-key") || c.req.header("anthropic-api-key");
+
+  // 如果是 Bearer token 格式，提取 token 部分
+  if (!userApiKey && authHeader && authHeader.startsWith("Bearer ")) {
+    userApiKey = authHeader.substring(7); // 移除 "Bearer " 前缀
+  }
+
+  if (!userApiKey) {
+    return c.json(
+      {
+        error: {
+          type: "authentication_error",
+          message:
+            "Missing API key. Please provide your API key in the 'Authorization: Bearer' header, or 'x-api-key' or 'anthropic-api-key' header.",
+        },
+      },
+      401,
+    );
+  }
+
+  const user = await db.query.users.findFirst({ where: eq(users.apiKey, userApiKey) });
+
   if (!user) {
-    return c.json({ success: false, message: "User not found in context" }, 401);
+    return c.json(
+      {
+        error: {
+          type: "authentication_error",
+          message: "Invalid API key",
+        },
+      },
+      401,
+    );
   }
 
   // 2. Find target model using the new mapping service
   const modelKeyword = claudeRequest.model;
   const mappingService = new ModelMappingService(db);
   const targetModel = await mappingService.findTargetModel(user.id, modelKeyword);
+
+  // 📋 关键信息日志
+  const keyPrefix = userApiKey.substring(0, 8);
+  const keySuffix = userApiKey.substring(userApiKey.length - 8);
+
+  // 计算输入字符长度
+  const inputLength = claudeRequest.messages.reduce((total: number, msg: any) => {
+    if (msg.content && Array.isArray(msg.content)) {
+      return (
+        total +
+        msg.content.reduce((sum: number, content: any) => {
+          if (content.type === "text") return sum + (content.text?.length || 0);
+          return sum;
+        }, 0)
+      );
+    } else if (msg.content && typeof msg.content === "string") {
+      return total + msg.content.length;
+    }
+    return total;
+  }, 0);
+
+  console.log(
+    `🔑 用户: ${user.username} | Key: ${keyPrefix}...${keySuffix} | 模型: ${modelKeyword} → ${targetModel} | 输入: ${inputLength} 字符`,
+  );
 
   // 检查是否成功映射到了不同的模型
   if (targetModel === modelKeyword) {
@@ -186,11 +248,18 @@ claude.openapi(messagesRoute, async (c) => {
   // 5. Handle response
   if (claudeRequest.stream) {
     // Stream response handling
-    return handleStreamingResponse(c, res, claudeRequest.model);
+    return handleStreamingResponse(c, res, claudeRequest.model, inputLength, user.username);
   } else {
     // Non-streaming response handling
     const openAIResponse = await res.json();
     const claudeResponse = convertOpenAIToClaude(openAIResponse, claudeRequest.model);
+
+    // 计算输出字符长度
+    const outputLength = claudeResponse.content?.[0]?.text?.length || 0;
+    console.log(
+      `📤 响应完成 | 用户: ${user.username} | 输入: ${inputLength} 字符 | 输出: ${outputLength} 字符 | 总计: ${inputLength + outputLength} 字符`,
+    );
+
     return c.json(claudeResponse);
   }
 });
@@ -198,7 +267,13 @@ claude.openapi(messagesRoute, async (c) => {
 /**
  * 处理流式响应
  */
-async function handleStreamingResponse(c: any, upstreamResponse: Response, originalModel: string) {
+async function handleStreamingResponse(
+  c: any,
+  upstreamResponse: Response,
+  originalModel: string,
+  inputLength: number,
+  username: string,
+) {
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
 
@@ -221,6 +296,7 @@ async function handleStreamingResponse(c: any, upstreamResponse: Response, origi
 
           let buffer = "";
           let finishReason: string | undefined;
+          let totalOutputLength = 0;
 
           while (true) {
             const { done, value } = await reader.read();
@@ -242,6 +318,12 @@ async function handleStreamingResponse(c: any, upstreamResponse: Response, origi
                   for (const event of finishEvents) {
                     controller.enqueue(encoder.encode(event));
                   }
+
+                  // 输出流式响应的字符统计日志
+                  console.log(
+                    `📤 流式响应完成 | 用户: ${username} | 输入: ${inputLength} 字符 | 输出: ${totalOutputLength} 字符 | 总计: ${inputLength + totalOutputLength} 字符`,
+                  );
+
                   controller.close();
                   return;
                 }
@@ -258,6 +340,24 @@ async function handleStreamingResponse(c: any, upstreamResponse: Response, origi
                   const events = converter.processOpenAIChunk(chunk);
                   for (const event of events) {
                     controller.enqueue(encoder.encode(event));
+
+                    // 统计输出字符长度（从content事件中提取）
+                    if (event.includes('"type":"content"')) {
+                      try {
+                        const eventData = event.split("\n").find((line) => line.startsWith("data: "));
+                        if (eventData) {
+                          const data = JSON.parse(eventData.slice(6));
+                          if (data.content && Array.isArray(data.content)) {
+                            const textContent = data.content.find((c: any) => c.type === "text");
+                            if (textContent?.text) {
+                              totalOutputLength += textContent.text.length;
+                            }
+                          }
+                        }
+                      } catch (e) {
+                        // 忽略解析错误，不影响流式响应
+                      }
+                    }
                   }
                 } catch (parseError) {
                   console.error("解析 SSE 数据失败:", parseError, "数据:", data);
@@ -271,6 +371,12 @@ async function handleStreamingResponse(c: any, upstreamResponse: Response, origi
           for (const event of finishEvents) {
             controller.enqueue(encoder.encode(event));
           }
+
+          // 输出流式响应的字符统计日志（异常结束情况）
+          console.log(
+            `📤 流式响应完成 | 用户: ${username} | 输入: ${inputLength} 字符 | 输出: ${totalOutputLength} 字符 | 总计: ${inputLength + totalOutputLength} 字符`,
+          );
+
           controller.close();
         } catch (error) {
           console.error("流式响应处理错误:", error);
@@ -300,59 +406,5 @@ async function handleStreamingResponse(c: any, upstreamResponse: Response, origi
     },
   );
 }
-
-// API Key 认证中间件（专用于 Claude API）
-export const claudeAuthMiddleware = async (c: any, next: any) => {
-  const authHeader = c.req.header("x-api-key") || c.req.header("anthropic-api-key");
-
-  if (!authHeader) {
-    return c.json(
-      {
-        error: {
-          type: "authentication_error",
-          message: "Missing API key. Please provide your API key in the 'x-api-key' or 'anthropic-api-key' header.",
-        },
-      },
-      401,
-    );
-  }
-
-  const db = c.get("db");
-
-  try {
-    // 通过 API Key 查找用户
-    const user = await db.select().from(users).where(eq(users.apiKey, authHeader)).get();
-
-    if (!user) {
-      return c.json(
-        {
-          error: {
-            type: "authentication_error",
-            message: "Invalid API key",
-          },
-        },
-        401,
-      );
-    }
-
-    // 将用户信息存储到上下文中
-    c.set("user", user);
-    await next();
-  } catch (error) {
-    console.error("Claude API 认证错误:", error);
-    return c.json(
-      {
-        error: {
-          type: "authentication_error",
-          message: "Authentication failed",
-        },
-      },
-      500,
-    );
-  }
-};
-
-// 应用认证中间件到所有路由
-claude.use("*", claudeAuthMiddleware);
 
 export default claude;

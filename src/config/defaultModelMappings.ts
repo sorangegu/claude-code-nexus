@@ -34,9 +34,9 @@ export const FIXED_MODEL_RULES: ModelMappingRule[] = [
 
 // 系统默认映射配置
 export const DEFAULT_MAPPING_CONFIG: ModelMappingConfig = {
-  haiku: "gpt-4o-mini",
-  sonnet: "gpt-4o",
-  opus: "gpt-4o",
+  haiku: "gemini-2.5-flash",
+  sonnet: "gemini-2.5-pro",
+  opus: "gemini-2.5-pro",
 };
 
 // 默认的 API 配置

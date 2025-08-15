@@ -37,14 +37,7 @@ app.use(
 app.route("/api", api);
 
 // Claude API compatible routes
-app.route(
-  "/v1",
-  claude.use("*", async (c, next) => {
-    const db = drizzle(c.env.DB, { schema: drizzleSchema });
-    c.set("db", db);
-    await next();
-  }),
-);
+app.route("/v1", claude);
 
 // OpenAPI Docs
 app.doc("/api/doc", {

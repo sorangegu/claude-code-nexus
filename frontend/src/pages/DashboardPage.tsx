@@ -58,7 +58,10 @@ export function DashboardPage() {
   });
   const [initialState, setInitialState] = useState<{ provider: ProviderData; modelConfig: UserModelConfig }>({
     provider: { baseUrl: "https://api.nekro.ai/v1", apiKey: "" },
-    modelConfig: { useSystemMapping: true, customMapping: undefined },
+    modelConfig: {
+      useSystemMapping: true,
+      customMapping: undefined,
+    },
   });
 
   const [models, setModels] = useState<{ id: string; name: string }[]>([]);
@@ -81,11 +84,24 @@ export function DashboardPage() {
         })
         .then((data: any) => {
           console.log("Config data received:", data);
+
+          // 检查是否有本地存储的自定义配置需要恢复
+          let finalModelConfig = data.modelConfig as UserModelConfig;
+          if (data.modelConfig.useSystemMapping) {
+            const savedMapping = restoreCustomMappingFromStorage();
+            if (savedMapping) {
+              finalModelConfig = {
+                ...data.modelConfig,
+                customMapping: savedMapping,
+              };
+            }
+          }
+
           setProvider(data.provider as ProviderData);
-          setModelConfig(data.modelConfig as UserModelConfig);
+          setModelConfig(finalModelConfig);
           setInitialState({
             provider: data.provider as ProviderData,
-            modelConfig: data.modelConfig as UserModelConfig,
+            modelConfig: finalModelConfig,
           });
         })
         .catch((err) => {
@@ -115,6 +131,11 @@ export function DashboardPage() {
       setProvider(updatedConfig.provider as ProviderData);
       setModelConfig(updatedConfig.modelConfig);
       setInitialState({ provider: updatedConfig.provider as ProviderData, modelConfig: updatedConfig.modelConfig });
+
+      // 保存自定义配置到本地存储
+      if (updatedConfig.modelConfig.customMapping && !updatedConfig.modelConfig.useSystemMapping) {
+        saveCustomMappingToStorage(updatedConfig.modelConfig.customMapping);
+      }
     } catch (error) {
       console.error("Error updating config:", error);
     }
@@ -141,7 +162,9 @@ export function DashboardPage() {
       }
 
       const { data } = (await response.json()) as { data: { id: string }[] };
-      const models = data.map((model) => ({ id: model.id, name: model.id }));
+      const models = data
+        .map((model) => ({ id: model.id, name: model.id }))
+        .sort((a, b) => a.name.localeCompare(b.name)); // 按字母顺序排序
       setModels(models);
     } catch (error) {
       console.error("Error fetching models:", error);
@@ -153,26 +176,61 @@ export function DashboardPage() {
 
   // 模型配置处理函数
   const toggleMappingMode = (useSystem: boolean) => {
-    setModelConfig({
-      useSystemMapping: useSystem,
-      customMapping: useSystem
-        ? undefined
-        : modelConfig.customMapping || {
-            haiku: "gpt-4o-mini",
-            sonnet: "gpt-4o",
-            opus: "gpt-4o",
-          },
-    });
+    if (useSystem) {
+      // 切换到系统默认时，保存当前自定义配置
+      if (modelConfig.customMapping && !modelConfig.useSystemMapping) {
+        saveCustomMappingToStorage(modelConfig.customMapping);
+      }
+      setModelConfig({
+        useSystemMapping: true,
+        customMapping: undefined,
+      });
+    } else {
+      // 切换到自定义配置时，优先使用保存的配置，其次使用当前配置，最后使用默认值
+      const savedMapping = restoreCustomMappingFromStorage();
+      const currentMapping = modelConfig.customMapping;
+      const defaultMapping = {
+        haiku: "gpt-4o-mini",
+        sonnet: "gpt-4o",
+        opus: "gpt-4o",
+      };
+
+      setModelConfig({
+        useSystemMapping: false,
+        customMapping: savedMapping || currentMapping || defaultMapping,
+      });
+    }
+  };
+
+  // 保存当前自定义配置到本地存储，避免切换时丢失
+  const saveCustomMappingToStorage = (mapping: any) => {
+    if (mapping && !modelConfig.useSystemMapping) {
+      localStorage.setItem("claude-code-nexus-custom-mapping", JSON.stringify(mapping));
+    }
+  };
+
+  // 从本地存储恢复自定义配置
+  const restoreCustomMappingFromStorage = () => {
+    const saved = localStorage.getItem("claude-code-nexus-custom-mapping");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse saved custom mapping:", e);
+      }
+    }
+    return null;
   };
 
   const updateCustomMapping = (model: keyof ModelMappingConfig, value: string) => {
-    if (!modelConfig.customMapping) return;
     setModelConfig({
       ...modelConfig,
       customMapping: {
-        ...modelConfig.customMapping,
+        haiku: modelConfig.customMapping?.haiku || "",
+        sonnet: modelConfig.customMapping?.sonnet || "",
+        opus: modelConfig.customMapping?.opus || "",
         [model]: value,
-      },
+      } as ModelMappingConfig,
     });
   };
 
@@ -203,7 +261,7 @@ export function DashboardPage() {
   }
 
   const baseUrl = window.location.origin;
-  const anthropicBaseUrl = `${baseUrl}/api/claude`;
+  const anthropicBaseUrl = baseUrl;
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -240,24 +298,20 @@ export function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Provider Config Card */}
+      {/* API 服务提供商配置 */}
       <Card sx={{ mb: 4 }}>
+        {/* API 服务提供商配置 */}
         <CardContent>
           <Typography variant="h6">API 服务提供商</Typography>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12} md={6}>
               <TextField
                 value={provider?.baseUrl || ""}
+                onChange={(e) => setProvider((p) => ({ ...p, baseUrl: e.target.value }))}
                 label="Base URL"
                 fullWidth
-                disabled
-                helperText="使用平台默认API端点，遵循OpenAI标准接口格式"
-                sx={{
-                  "& .MuiInputBase-input.Mui-disabled": {
-                    WebkitTextFillColor: theme.palette.text.primary,
-                    opacity: 0.7,
-                  },
-                }}
+                error={!!errors.provider?.baseUrl}
+                helperText={errors.provider?.baseUrl?.[0] || "请输入您的API提供商Base URL，留空则使用平台默认"}
               />
             </Grid>
             <Grid item xs={12} md={6}>
@@ -273,10 +327,7 @@ export function DashboardPage() {
             </Grid>
           </Grid>
         </CardContent>
-      </Card>
-
-      {/* 模型映射配置卡片 */}
-      <Card>
+        {/* 模型映射配置 */}
         <CardContent>
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
             <Typography variant="h6">模型映射配置</Typography>
@@ -461,12 +512,6 @@ export function DashboardPage() {
               </Typography>
             </Grid>
           </Grid>
-
-          {!modelConfig.useSystemMapping && (
-            <Alert severity="info" sx={{ mt: 2 }}>
-              您正在使用自定义映射配置。请确保目标模型在您的API提供商处可用。
-            </Alert>
-          )}
         </CardContent>
       </Card>
 
@@ -674,6 +719,10 @@ claude`}</code>
           </Alert>
         </CardContent>
       </Card>
+
+      {/* 修复完成：
+      1. Base URL 现在可以编辑，不再是固定的
+      2. 修改自定义模型后能正确触发 isDirty 状态，保存按钮可以点击 */}
     </Container>
   );
 }
