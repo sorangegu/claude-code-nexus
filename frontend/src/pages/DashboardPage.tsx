@@ -12,12 +12,8 @@ import {
   useTheme,
   TextField,
   CircularProgress,
-  Switch,
-  FormControlLabel,
   Autocomplete,
   Chip,
-  Tooltip,
-  Divider,
 } from "@mui/material";
 import {
   ContentCopy as CopyIcon,
@@ -419,7 +415,7 @@ export function DashboardPage() {
                     {...params}
                     label="目标模型"
                     error={!!errors.modelConfig?.customMapping?.haiku}
-                    helperText={errors.modelConfig?.customMapping?.haiku?.[0] || "从上方获取模型列表后选择，或手动输入"}
+                    helperText={errors.modelConfig?.customMapping?.haiku?.[0]}
                   />
                 )}
               />
@@ -459,9 +455,7 @@ export function DashboardPage() {
                     {...params}
                     label="目标模型"
                     error={!!errors.modelConfig?.customMapping?.sonnet}
-                    helperText={
-                      errors.modelConfig?.customMapping?.sonnet?.[0] || "从上方获取模型列表后选择，或手动输入"
-                    }
+                    helperText={errors.modelConfig?.customMapping?.sonnet?.[0]}
                   />
                 )}
               />
@@ -501,7 +495,7 @@ export function DashboardPage() {
                     {...params}
                     label="目标模型"
                     error={!!errors.modelConfig?.customMapping?.opus}
-                    helperText={errors.modelConfig?.customMapping?.opus?.[0] || "从上方获取模型列表后选择，或手动输入"}
+                    helperText={errors.modelConfig?.customMapping?.opus?.[0]}
                   />
                 )}
               />
@@ -602,7 +596,7 @@ claude --version`}</code>
 
             <Alert severity="info" sx={{ mb: 2 }}>
               <Typography variant="body2">
-                <strong>配置信息：</strong>使用以下信息配置Claude Code，让它通过我们的代理访问您的API服务：
+                <strong>变量配置：</strong>请将以下环境变量配置到您的终端环境中，Claude Code 将自动使用这些配置
               </Typography>
             </Alert>
 
@@ -704,9 +698,11 @@ claude --version`}</code>
                 border: `1px solid ${theme.palette.divider}`,
               }}
             >
-              <code>{`cd your-project-folder
-export ANTHROPIC_AUTH_TOKEN=${user?.apiKey || "ak-your-api-key"}
-export ANTHROPIC_BASE_URL=https://claude.nekro.ai
+              <code>{`# 如果需要在终端中自动使用配置，可以以下内容添加到 \`.bashrc\` 或 \`.zshrc\` 中
+export ANTHROPIC_AUTH_TOKEN="${user?.apiKey || "ak-your-api-key"}"
+export ANTHROPIC_BASE_URL="https://claude.nekro.ai"
+
+# 运行 Claude Code
 claude`}</code>
             </Box>
           </Box>

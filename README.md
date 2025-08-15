@@ -1,8 +1,10 @@
 # Claude Code Nexus
 
+[English](README_EN.md) | 中文版
+
 > 🤖 **一个 Claude API 代理服务平台 - 让 Claude Code CLI 无缝兼容任何 OpenAI API 服务**
 
-[![部署状态](https://img.shields.io/badge/部署-在线-brightgreen)](https://claude.nekro.ai/) [![构建状态](https://img.shields.io/github/actions/workflow/status/KroMiose/claude-code-nexus/deploy.yml?branch=main)](https://github.com/KroMiose/claude-code-nexus/actions) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![部署状态](https://img.shields.io/badge/部署-在线-brightgreen)](https://claude.nekro.ai/) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE) [![QQ群1](<https://img.shields.io/badge/QQ群1-636925153(将满)-12B7F3?style=flat-square&logo=tencentqq>)](https://qm.qq.com/q/eT30LxDcSA) [![QQ群2](<https://img.shields.io/badge/QQ群2-679808796(新开)-12B7F3?style=flat-square&logo=tencentqq>)](https://qm.qq.com/q/ZQ6QHdkXu0) [![Discord](https://img.shields.io/badge/Discord-加入频道-5865F2?style=flat-square&logo=discord)](https://discord.gg/eMsgwFnxUB)
 
 **Claude Code Nexus** 是一个部署在 Cloudflare 上的高性能 AI 代理服务平台。它专为 [Claude Code CLI](https://github.com/claude-code/cli) 设计，通过一个兼容层，让你可以将 Claude Code 的请求无缝转发到**任何 OpenAI 兼容的 API 服务**，例如 OneAPI、Azure OpenAI、本地的 Ollama，或是其他任何遵循 OpenAI 规范的 LLM 服务。
 
@@ -58,6 +60,14 @@ claude "用 Rust 写一个 hello world"
 我们提供了完整的项目需求和实现细节文档：
 
 - [**项目需求文档 (PRD)**](./REQUIREMENTS.md) - 深入了解项目的设计理念、功能架构和技术实现细节。
+
+## 🔗 相关项目
+
+如果您正在寻找一款高扩展性的 AI Agent 框架，我们推荐您关注我们的另一个项目：
+
+**[Nekro Agent](https://github.com/KroMiose/nekro-agent)** - 一个集代码执行能力与高度可扩展性为一体的多人跨平台聊天机器人框架。支持沙盒驱动、可视化界面、高扩展性插件系统，原生支持 QQ、Discord、Minecraft、B站直播等多种平台。如果您需要构建智能聊天机器人或自动化 Agent 系统，Nekro Agent 将是您的理想选择。
+
+---
 
 ## 🤝 参与贡献
 
