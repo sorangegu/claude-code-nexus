@@ -13,8 +13,11 @@ import { secureHeaders } from "hono/secure-headers";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { etag } from "hono/etag";
+import { drizzle, type DrizzleD1Database } from "drizzle-orm/d1";
+import * as drizzleSchema from "./db/schema";
 
 import api from "./routes/api";
+import claude from "./routes/claude";
 import { Bindings } from "./types";
 
 const app = new OpenAPIHono<{ Bindings: Bindings }>();
@@ -31,6 +34,16 @@ app.use(
 
 // API routes
 app.route("/api", api);
+
+// Claude API compatible routes
+app.route(
+  "/v1",
+  claude.use("*", async (c, next) => {
+    const db = drizzle(c.env.DB, { schema: drizzleSchema });
+    c.set("db", db);
+    await next();
+  }),
+);
 
 // OpenAPI Docs
 app.doc("/api/doc", {
