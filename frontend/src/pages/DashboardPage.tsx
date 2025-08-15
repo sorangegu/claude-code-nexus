@@ -199,7 +199,7 @@ export function DashboardPage() {
   }
 
   if (!isAuthenticated) {
-    return <Alert severity="info">请先登录以访问仪表盘</Alert>;
+    return <Alert severity="info">请先登录以访问控制台</Alert>;
   }
 
   const baseUrl = window.location.origin;
@@ -208,7 +208,7 @@ export function DashboardPage() {
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Typography variant="h3" component="h1" gutterBottom>
-        仪表盘与配置
+        控制台
       </Typography>
 
       {/* API Key Info */}

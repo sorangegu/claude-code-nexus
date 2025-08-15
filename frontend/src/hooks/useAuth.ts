@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect, useMemo } from "react";
+import { safeLocalStorage, isBrowser } from "../utils/storage";
 
 // 类型定义
 interface User {
@@ -34,7 +35,7 @@ const authApi = {
 
   // 获取当前用户信息
   getCurrentUser: async (): Promise<User> => {
-    const token = localStorage.getItem("auth_token");
+    const token = safeLocalStorage.getItem("auth_token");
     if (!token) {
       throw new Error("No auth token found");
     }
@@ -47,7 +48,7 @@ const authApi = {
 
     if (!response.ok) {
       if (response.status === 401) {
-        localStorage.removeItem("auth_token");
+        safeLocalStorage.removeItem("auth_token");
         throw new Error("Token expired");
       }
       throw new Error("Failed to fetch user");
@@ -58,7 +59,7 @@ const authApi = {
 
   // 登出
   logout: async (): Promise<void> => {
-    const token = localStorage.getItem("auth_token");
+    const token = safeLocalStorage.getItem("auth_token");
     if (token) {
       await fetch("/api/auth/logout", {
         method: "POST",
@@ -66,14 +67,14 @@ const authApi = {
           Authorization: `Bearer ${token}`,
         },
       });
-      localStorage.removeItem("auth_token");
+      safeLocalStorage.removeItem("auth_token");
     }
   },
 };
 
 // 封装 fetch 并添加认证头
 export const fetchWithAuth = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-  const token = localStorage.getItem("auth_token");
+  const token = safeLocalStorage.getItem("auth_token");
   const headers = new Headers(init?.headers);
 
   if (token) {
@@ -92,7 +93,7 @@ export const fetchWithAuth = async (input: RequestInfo | URL, init?: RequestInit
 export function useAuth() {
   const queryClient = useQueryClient();
   const [isInitialized, setIsInitialized] = useState(false);
-  const [hasToken, setHasToken] = useState(() => !!localStorage.getItem("auth_token"));
+  const [hasToken, setHasToken] = useState(() => !!safeLocalStorage.getItem("auth_token"));
 
   // 查询当前用户
   const {
@@ -115,7 +116,9 @@ export function useAuth() {
     mutationFn: authApi.getLoginUrl,
     onSuccess: (data) => {
       // 跳转到 GitHub 授权页面
-      window.location.href = data.authUrl;
+      if (isBrowser) {
+        window.location.href = data.authUrl;
+      }
     },
   });
 
@@ -123,17 +126,48 @@ export function useAuth() {
   const logoutMutation = useMutation({
     mutationFn: authApi.logout,
     onSuccess: () => {
-      localStorage.removeItem("auth_token");
+      safeLocalStorage.removeItem("auth_token");
       setHasToken(false);
       queryClient.clear();
-      window.location.href = "/";
+      if (isBrowser) {
+        window.location.href = "/";
+      }
     },
   });
 
   useEffect(() => {
-    setHasToken(!!localStorage.getItem("auth_token"));
+    setHasToken(!!safeLocalStorage.getItem("auth_token"));
     setIsInitialized(true);
+
+    // 监听 storage 事件，当其他标签页或组件修改 localStorage 时同步状态
+    const handleStorageChange = () => {
+      const newToken = !!safeLocalStorage.getItem("auth_token");
+      console.log("Auth token changed, updating hasToken:", newToken);
+      setHasToken(newToken);
+    };
+
+    if (isBrowser) {
+      window.addEventListener("storage", handleStorageChange);
+      // 添加自定义事件监听，用于同一标签页内的 localStorage 变化
+      window.addEventListener("auth_token_changed", handleStorageChange);
+    }
+
+    return () => {
+      if (isBrowser) {
+        window.removeEventListener("storage", handleStorageChange);
+        window.removeEventListener("auth_token_changed", handleStorageChange);
+      }
+    };
   }, []);
+
+  // 增强的 refetch 函数，同时更新 hasToken 状态
+  const enhancedRefetch = async () => {
+    const currentToken = !!safeLocalStorage.getItem("auth_token");
+    setHasToken(currentToken);
+    if (currentToken) {
+      return await refetch();
+    }
+  };
 
   // 登录函数
   const login = () => {
@@ -164,7 +198,7 @@ export function useAuth() {
     error,
     login,
     logout,
-    refetch,
+    refetch: enhancedRefetch,
     isLoginLoading: loginMutation.isPending,
     isLogoutLoading: logoutMutation.isPending,
   };

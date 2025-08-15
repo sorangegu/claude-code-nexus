@@ -6,6 +6,7 @@ import { useAuth } from "../hooks/useAuth";
 import { AuthResponseSchema, UserInfoSchema } from "../../../common/validators/auth.schema";
 import { useRef } from "react";
 import { z } from "zod";
+import { safeLocalStorage } from "../utils/storage";
 
 export function AuthCallbackPage() {
   const navigate = useNavigate();
@@ -35,9 +36,13 @@ export function AuthCallbackPage() {
         const data: z.infer<typeof AuthResponseSchema> = await response.json();
 
         if (data.success && data.data) {
-          localStorage.setItem("auth_token", data.data.sessionToken);
+          // 1. 设置 token 到 localStorage (会触发 auth_token_changed 事件)
+          safeLocalStorage.setItem("auth_token", data.data.sessionToken);
+          // 2. 设置用户数据到 QueryClient 缓存
           queryClient.setQueryData<z.infer<typeof UserInfoSchema>>(["auth", "user"], data.data.user);
+          // 3. 触发 refetch 以确保状态同步
           await refetch();
+          // 4. 导航到控制台页面
           navigate("/dashboard");
         } else {
           console.error("Authentication failed:", data.message);

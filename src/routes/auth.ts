@@ -331,20 +331,24 @@ auth
         }),
       )}`;
 
-      return c.json({
-        success: true,
-        message: "登录成功",
-        data: {
-          user: {
-            id: user.id,
-            username: user.username,
-            email: user.email,
-            avatarUrl: user.avatarUrl,
-            apiKey: user.apiKey,
+      return c.json(
+        {
+          success: true,
+          message: "登录成功",
+          data: {
+            user: {
+              id: user.id,
+              username: user.username,
+              email: user.email,
+              avatarUrl: user.avatarUrl,
+              apiKey: user.apiKey,
+              createdAt: user.createdAt.toISOString(),
+            },
+            sessionToken,
           },
-          sessionToken,
         },
-      });
+        200,
+      );
     } catch (error) {
       console.error("GitHub OAuth 登录失败:", error);
       return c.json(
@@ -361,7 +365,7 @@ protectedRoutes
   .openapi(meRoute, async (c) => {
     const authHeader = c.req.header("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return c.json({ success: false, message: "认证令牌缺失" }, 401);
+      return c.json({ code: 401, message: "认证令牌缺失" }, 401);
     }
 
     const sessionToken = authHeader.substring(7);
@@ -377,7 +381,7 @@ protectedRoutes
     console.log(`[Auth Me] Session found in DB:`, session);
 
     if (!session) {
-      return c.json({ success: false, message: "认证令牌无效或已过期" }, 401);
+      return c.json({ code: 401, message: "认证令牌无效或已过期" }, 401);
     }
 
     const user = await db.select().from(users).where(eq(users.id, session.userId)).get();
@@ -401,7 +405,7 @@ protectedRoutes
       createdAt: user.createdAt.toISOString(),
     });
 
-    return c.json(result);
+    return c.json(result, 200);
   })
   .openapi(logoutRoute, async (c) => {
     const sessionToken = c.req.header("Authorization")?.replace("Bearer ", "");

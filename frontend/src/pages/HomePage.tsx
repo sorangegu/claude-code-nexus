@@ -89,7 +89,7 @@ const HomePage = () => {
                 Claude Code Nexus
               </Typography>
               <Typography variant="h5" color="text.secondary" paragraph>
-                让 Claude Code 任意 OpenAI 兼容 API
+                让 Claude Code 兼容任意 OpenAI API
               </Typography>
               <Typography variant="body1" paragraph sx={{ mb: 4, fontSize: "1.1rem" }}>
                 无缝代理转发，完美兼容 Claude API，支持 OneAPI、Azure OpenAI、本地 Ollama 等任何 OpenAI 兼容服务。

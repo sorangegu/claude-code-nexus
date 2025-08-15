@@ -16,6 +16,7 @@ export const UserInfoSchema = z.object({
   email: z.string().nullable(),
   avatarUrl: z.string().nullable(),
   apiKey: z.string(),
+  createdAt: z.string(),
 });
 
 export const AuthResponseSchema = z.object({
