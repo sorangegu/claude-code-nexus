@@ -23,7 +23,7 @@
 3. 填写应用信息：
    - **Application name**: `Claude Code Nexus`（或您的应用名称）
    - **Homepage URL**: `https://your-domain.com`（您的实际域名）
-   - **Authorization callback URL**: `https://your-domain.com/api/auth/github/callback`
+   - **Authorization callback URL**: `https://your-domain.com/auth/callback`
 4. 创建后记录 **Client ID** 和 **Client Secret**
 
 #### 加密密钥生成

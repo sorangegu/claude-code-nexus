@@ -29,6 +29,7 @@ app.use(
   cors({
     origin: "*", // You may want to configure this more strictly for production
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allowHeaders: ["Content-Type", "Authorization"],
   }),
 );
 

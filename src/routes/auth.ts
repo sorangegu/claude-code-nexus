@@ -1,12 +1,14 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { eq } from "drizzle-orm";
 import { users, userSessions } from "../db/schema";
-import { GitHubCallbackSchema, AuthResponseSchema, UserInfoSchema, ErrorSchema } from "../validators/auth.schema";
+import { AuthResponseSchema, GitHubCallbackSchema, ErrorSchema, UserInfoSchema } from "@common/validators/auth.schema";
 import { generateUserApiKey } from "../utils/encryption";
 import { createId } from "@paralleldrive/cuid2";
 import type { Bindings } from "../types";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
 import * as drizzleSchema from "../db/schema";
+import { and, gt } from "drizzle-orm";
+import { authMiddleware } from "../middleware/auth";
 
 type Variables = {
   db: DrizzleD1Database<typeof drizzleSchema>;
@@ -141,8 +143,13 @@ const logoutRoute = createRoute({
   },
 });
 
-const app = new OpenAPIHono<{ Bindings: Bindings; Variables: Variables }>()
-  .openapi(loginRoute as any, async (c) => {
+const auth = new OpenAPIHono<{ Bindings: Bindings; Variables: Variables }>();
+const protectedRoutes = new OpenAPIHono<{ Bindings: Bindings; Variables: Variables }>();
+
+protectedRoutes.use("/*", authMiddleware);
+
+auth
+  .openapi(loginRoute, async (c) => {
     const githubClientId = c.env.GITHUB_CLIENT_ID;
     const baseUrl = c.env.APP_BASE_URL;
 
@@ -157,7 +164,7 @@ const app = new OpenAPIHono<{ Bindings: Bindings; Variables: Variables }>()
     }
 
     const state = createId(); // 用于防止 CSRF 攻击
-    const redirectUri = `${baseUrl}/api/auth/github/callback`;
+    const redirectUri = `${baseUrl}/auth/callback`;
 
     const githubAuthUrl = new URL("https://github.com/login/oauth/authorize");
     githubAuthUrl.searchParams.set("client_id", githubClientId);
@@ -174,7 +181,7 @@ const app = new OpenAPIHono<{ Bindings: Bindings; Variables: Variables }>()
       },
     });
   })
-  .openapi(callbackRoute as any, async (c) => {
+  .openapi(callbackRoute, async (c) => {
     const code = c.req.query("code")!;
     const state = c.req.query("state");
     const db = c.get("db");
@@ -185,19 +192,37 @@ const app = new OpenAPIHono<{ Bindings: Bindings; Variables: Variables }>()
         method: "POST",
         headers: {
           Accept: "application/json",
-          "Content-Type": "application/json",
+          "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: JSON.stringify({
+        body: new URLSearchParams({
           client_id: c.env.GITHUB_CLIENT_ID,
           client_secret: c.env.GITHUB_CLIENT_SECRET,
           code,
-          state,
         }),
       });
 
-      const tokenData: any = await tokenResponse.json();
+      if (!tokenResponse.ok) {
+        console.error("GitHub token request failed:", tokenResponse.status, tokenResponse.statusText);
+        return c.json(
+          {
+            success: false,
+            message: "获取 GitHub 访问令牌失败",
+          },
+          400,
+        );
+      }
+
+      const tokenData = (await tokenResponse.json()) as {
+        access_token?: string;
+        token_type?: string;
+        scope?: string;
+        error?: string;
+        error_description?: string;
+      };
+      console.log("GitHub token response:", tokenData);
 
       if (!tokenData.access_token) {
+        console.error("GitHub token data invalid:", tokenData);
         return c.json(
           {
             success: false,
@@ -210,12 +235,32 @@ const app = new OpenAPIHono<{ Bindings: Bindings; Variables: Variables }>()
       // 2. 使用 access token 获取用户信息
       const userResponse = await fetch("https://api.github.com/user", {
         headers: {
-          Authorization: `Bearer ${tokenData.access_token}`,
+          Authorization: `token ${tokenData.access_token}`,
+          "User-Agent": "claude-code-nexus",
           Accept: "application/vnd.github.v3+json",
         },
       });
 
-      const githubUser: any = await userResponse.json();
+      if (!userResponse.ok) {
+        console.error("GitHub user request failed:", userResponse.status, userResponse.statusText);
+        const errorText = await userResponse.text();
+        console.error("GitHub user error response:", errorText);
+        return c.json(
+          {
+            success: false,
+            message: "获取 GitHub 用户信息失败",
+          },
+          400,
+        );
+      }
+
+      const githubUser = (await userResponse.json()) as {
+        id?: number;
+        login?: string;
+        email?: string;
+        avatar_url?: string;
+        name?: string;
+      };
 
       if (!githubUser.id) {
         return c.json(
@@ -238,9 +283,9 @@ const app = new OpenAPIHono<{ Bindings: Bindings; Variables: Variables }>()
           await db
             .update(users)
             .set({
-              username: githubUser.login,
-              email: githubUser.email,
-              avatarUrl: githubUser.avatar_url,
+              username: githubUser.login!,
+              email: githubUser.email || null,
+              avatarUrl: githubUser.avatar_url || null,
               updatedAt: new Date(),
             })
             .where(eq(users.id, existingUser.id))
@@ -252,10 +297,10 @@ const app = new OpenAPIHono<{ Bindings: Bindings; Variables: Variables }>()
           await db
             .insert(users)
             .values({
-              githubId: githubUser.id.toString(),
-              username: githubUser.login,
-              email: githubUser.email,
-              avatarUrl: githubUser.avatar_url,
+              githubId: githubUser.id!.toString(),
+              username: githubUser.login!,
+              email: githubUser.email || null,
+              avatarUrl: githubUser.avatar_url || null,
               apiKey: generateUserApiKey(),
             })
             .returning()
@@ -271,6 +316,20 @@ const app = new OpenAPIHono<{ Bindings: Bindings; Variables: Variables }>()
         sessionToken,
         expiresAt,
       });
+
+      console.log(`[Auth Callback] Session created for user ${user.id} with token ${sessionToken}`);
+
+      // 成功登录后，重定向到前端页面并传递 sessionToken
+      const baseUrl = c.env.APP_BASE_URL || "http://localhost:8787";
+      const redirectUrl = `${baseUrl}/?token=${sessionToken}&user=${encodeURIComponent(
+        JSON.stringify({
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          avatarUrl: user.avatarUrl,
+          apiKey: user.apiKey,
+        }),
+      )}`;
 
       return c.json({
         success: true,
@@ -296,9 +355,32 @@ const app = new OpenAPIHono<{ Bindings: Bindings; Variables: Variables }>()
         500,
       );
     }
-  })
-  .openapi(meRoute as any, async (c) => {
-    const user = c.get("user");
+  });
+
+protectedRoutes
+  .openapi(meRoute, async (c) => {
+    const authHeader = c.req.header("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return c.json({ success: false, message: "认证令牌缺失" }, 401);
+    }
+
+    const sessionToken = authHeader.substring(7);
+    console.log(`[Auth Me] Checking token: ${sessionToken}`);
+    const db = c.get("db");
+
+    const session = await db
+      .select()
+      .from(userSessions)
+      .where(and(eq(userSessions.sessionToken, sessionToken), gt(userSessions.expiresAt, new Date())))
+      .get();
+
+    console.log(`[Auth Me] Session found in DB:`, session);
+
+    if (!session) {
+      return c.json({ success: false, message: "认证令牌无效或已过期" }, 401);
+    }
+
+    const user = await db.select().from(users).where(eq(users.id, session.userId)).get();
 
     if (!user) {
       return c.json(
@@ -321,7 +403,7 @@ const app = new OpenAPIHono<{ Bindings: Bindings; Variables: Variables }>()
 
     return c.json(result);
   })
-  .openapi(logoutRoute as any, async (c) => {
+  .openapi(logoutRoute, async (c) => {
     const sessionToken = c.req.header("Authorization")?.replace("Bearer ", "");
 
     if (sessionToken) {
@@ -335,56 +417,6 @@ const app = new OpenAPIHono<{ Bindings: Bindings; Variables: Variables }>()
     });
   });
 
-// 认证中间件
-export const authMiddleware = async (c: any, next: any) => {
-  const authHeader = c.req.header("Authorization");
-
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return c.json(
-      {
-        success: false,
-        message: "缺少认证令牌",
-      },
-      401,
-    );
-  }
-
-  const sessionToken = authHeader.replace("Bearer ", "");
-  const db = c.get("db");
-
-  try {
-    const session = await db
-      .select({
-        session: userSessions,
-        user: users,
-      })
-      .from(userSessions)
-      .innerJoin(users, eq(userSessions.userId, users.id))
-      .where(eq(userSessions.sessionToken, sessionToken))
-      .get();
-
-    if (!session || session.session.expiresAt < new Date()) {
-      return c.json(
-        {
-          success: false,
-          message: "认证令牌无效或已过期",
-        },
-        401,
-      );
-    }
-
-    c.set("user", session.user);
-    await next();
-  } catch (error) {
-    console.error("认证中间件错误:", error);
-    return c.json(
-      {
-        success: false,
-        message: "认证验证失败",
-      },
-      500,
-    );
-  }
-};
+const app = new OpenAPIHono().route("/", auth).route("/", protectedRoutes);
 
 export default app;

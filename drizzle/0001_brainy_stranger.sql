@@ -1,32 +1,17 @@
-CREATE TABLE `api_providers` (
+CREATE TABLE `user_model_config` (
 	`id` text PRIMARY KEY NOT NULL,
 	`user_id` text NOT NULL,
-	`name` text NOT NULL,
-	`base_url` text NOT NULL,
-	`api_key` text NOT NULL,
-	`is_default` integer DEFAULT false NOT NULL,
+	`use_system_mapping` integer DEFAULT true NOT NULL,
+	`custom_haiku` text,
+	`custom_sonnet` text,
+	`custom_opus` text,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE INDEX `api_providers_user_id_idx` ON `api_providers` (`user_id`);--> statement-breakpoint
-CREATE TABLE `model_mappings` (
-	`id` text PRIMARY KEY NOT NULL,
-	`user_id` text NOT NULL,
-	`keyword` text NOT NULL,
-	`provider_id` text NOT NULL,
-	`target_model` text NOT NULL,
-	`priority` integer DEFAULT 0 NOT NULL,
-	`is_enabled` integer DEFAULT true NOT NULL,
-	`created_at` integer NOT NULL,
-	`updated_at` integer NOT NULL,
-	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`provider_id`) REFERENCES `api_providers`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `model_mappings_user_id_idx` ON `model_mappings` (`user_id`);--> statement-breakpoint
-CREATE INDEX `model_mappings_priority_idx` ON `model_mappings` (`user_id`,`priority`);--> statement-breakpoint
+CREATE UNIQUE INDEX `user_model_config_user_id_unique` ON `user_model_config` (`user_id`);--> statement-breakpoint
+CREATE INDEX `user_model_config_user_id_idx` ON `user_model_config` (`user_id`);--> statement-breakpoint
 CREATE TABLE `user_sessions` (
 	`id` text PRIMARY KEY NOT NULL,
 	`user_id` text NOT NULL,
@@ -46,8 +31,9 @@ CREATE TABLE `users` (
 	`email` text,
 	`avatar_url` text,
 	`api_key` text NOT NULL,
-	`created_at` integer NOT NULL,
-	`updated_at` integer NOT NULL
+	`encrypted_provider_api_key` text,
+	`created_at` integer DEFAULT (strftime('%s', 'now')) NOT NULL,
+	`updated_at` integer DEFAULT (strftime('%s', 'now')) NOT NULL
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `users_github_id_unique` ON `users` (`github_id`);--> statement-breakpoint

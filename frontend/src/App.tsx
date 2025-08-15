@@ -16,7 +16,6 @@ import {
 import {
   AccountCircle as AccountIcon,
   Dashboard as DashboardIcon,
-  Settings as SettingsIcon,
   ExitToApp as LogoutIcon,
   GitHub as GitHubIcon,
 } from "@mui/icons-material";
@@ -90,18 +89,6 @@ function App() {
             <Box sx={{ flexGrow: 1 }} />
 
             {/* 导航链接 */}
-            <Button
-              component={RouterLink}
-              to="/features"
-              sx={{
-                my: 2,
-                color: "inherit",
-                display: "block",
-                fontWeight: location.pathname === "/features" ? "bold" : "normal",
-              }}
-            >
-              API 示例
-            </Button>
 
             {isAuthenticated && (
               <>
@@ -115,19 +102,7 @@ function App() {
                     fontWeight: location.pathname === "/dashboard" ? "bold" : "normal",
                   }}
                 >
-                  仪表盘
-                </Button>
-                <Button
-                  component={RouterLink}
-                  to="/settings"
-                  sx={{
-                    my: 2,
-                    color: "inherit",
-                    display: "block",
-                    fontWeight: location.pathname === "/settings" ? "bold" : "normal",
-                  }}
-                >
-                  设置
+                  控制台
                 </Button>
               </>
             )}
@@ -162,11 +137,7 @@ function App() {
                 >
                   <MenuItem onClick={handleMenuClose} component={RouterLink} to="/dashboard">
                     <DashboardIcon sx={{ mr: 1 }} />
-                    仪表盘
-                  </MenuItem>
-                  <MenuItem onClick={handleMenuClose} component={RouterLink} to="/settings">
-                    <SettingsIcon sx={{ mr: 1 }} />
-                    设置
+                    控制台
                   </MenuItem>
                   <MenuItem onClick={handleLogout}>
                     <LogoutIcon sx={{ mr: 1 }} />

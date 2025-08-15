@@ -1,5 +1,6 @@
 import { sqliteTable, text, integer, unique, index } from "drizzle-orm/sqlite-core";
 import { createId } from "@paralleldrive/cuid2";
+import { sql } from "drizzle-orm";
 
 // 保留原有的 features 表
 export const features = sqliteTable(
@@ -27,13 +28,17 @@ export const users = sqliteTable(
     username: text("username").notNull(),
     email: text("email"),
     avatarUrl: text("avatar_url"),
-    apiKey: text("api_key").notNull().unique(), // 用户专属的 ANTHROPIC_API_KEY
+    apiKey: text("api_key")
+      .notNull()
+      .unique()
+      .$defaultFn(() => `ak-${createId()}`),
+    encryptedProviderApiKey: text("encrypted_provider_api_key"),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
-      .$defaultFn(() => new Date()),
+      .default(sql`(strftime('%s', 'now'))`),
     updatedAt: integer("updated_at", { mode: "timestamp" })
       .notNull()
-      .$defaultFn(() => new Date()),
+      .default(sql`(strftime('%s', 'now'))`),
   },
   (table) => [index("users_github_id_idx").on(table.githubId), index("users_api_key_idx").on(table.apiKey)],
 );
@@ -60,20 +65,22 @@ export const userSessions = sqliteTable(
   ],
 );
 
-// API 提供商配置表
-export const apiProviders = sqliteTable(
-  "api_providers",
+// 用户模型映射配置表 - 存储用户的映射模式和自定义配置
+export const userModelConfig = sqliteTable(
+  "user_model_config",
   {
     id: text("id")
       .primaryKey()
       .$defaultFn(() => createId()),
     userId: text("user_id")
       .notNull()
+      .unique()
       .references(() => users.id, { onDelete: "cascade" }),
-    name: text("name").notNull(), // 例如: "我的 OneAPI 服务", "Azure GPT-4o"
-    baseUrl: text("base_url").notNull(), // 例如: "https://api.oneapi.com", "https://my-resource.openai.azure.com"
-    apiKey: text("api_key").notNull(), // 加密存储的 API Key
-    isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
+    useSystemMapping: integer("use_system_mapping", { mode: "boolean" }).notNull().default(true), // true=使用系统默认映射，false=使用自定义映射
+    // 自定义映射配置（JSON格式存储三个固定映射）
+    customHaiku: text("custom_haiku"), // 自定义haiku映射
+    customSonnet: text("custom_sonnet"), // 自定义sonnet映射
+    customOpus: text("custom_opus"), // 自定义opus映射
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .$defaultFn(() => new Date()),
@@ -81,35 +88,5 @@ export const apiProviders = sqliteTable(
       .notNull()
       .$defaultFn(() => new Date()),
   },
-  (table) => [index("api_providers_user_id_idx").on(table.userId)],
-);
-
-// 模型映射规则表
-export const modelMappings = sqliteTable(
-  "model_mappings",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => createId()),
-    userId: text("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    keyword: text("keyword").notNull(), // 匹配关键词，例如: "haiku", "sonnet"
-    providerId: text("provider_id")
-      .notNull()
-      .references(() => apiProviders.id, { onDelete: "cascade" }),
-    targetModel: text("target_model").notNull(), // 目标模型名称，例如: "gpt-4o-mini", "gpt-4o"
-    priority: integer("priority").notNull().default(0), // 优先级，数字越小优先级越高
-    isEnabled: integer("is_enabled", { mode: "boolean" }).notNull().default(true),
-    createdAt: integer("created_at", { mode: "timestamp" })
-      .notNull()
-      .$defaultFn(() => new Date()),
-    updatedAt: integer("updated_at", { mode: "timestamp" })
-      .notNull()
-      .$defaultFn(() => new Date()),
-  },
-  (table) => [
-    index("model_mappings_user_id_idx").on(table.userId),
-    index("model_mappings_priority_idx").on(table.userId, table.priority),
-  ],
+  (table) => [index("user_model_config_user_id_idx").on(table.userId)],
 );

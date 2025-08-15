@@ -2,8 +2,8 @@
   "compilerOptions": {
     "target": "ESNext",
     "module": "ESNext",
-    "moduleResolution": "bundler",
-    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "moduleResolution": "node",
+    "lib": ["ESNext", "DOM"],
     "jsx": "react-jsx",
     "jsxImportSource": "react",
     "strict": true,
@@ -19,11 +19,12 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@frontend/*": ["./frontend/src/*"]
+      "@frontend/*": ["./frontend/src/*"],
+      "@common/*": ["./common/*"]
     },
     "types": ["@cloudflare/workers-types", "vite/client"],
     "allowImportingTsExtensions": true
   },
-  "include": ["src/**/*.ts", "src/ambient.d.ts", "frontend/src", "worker-configuration.d.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src", "frontend/src", "common"],
+  "exclude": ["node_modules", "dist", "frontend/dist"]
 }

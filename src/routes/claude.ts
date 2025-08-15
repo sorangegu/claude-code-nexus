@@ -1,16 +1,16 @@
 import { OpenAPIHono, createRoute } from "@hono/zod-openapi";
-import { eq, and, asc } from "drizzle-orm";
-import { users, apiProviders, modelMappings } from "../db/schema";
-import { ClaudeRequestSchema, ClaudeResponseSchema } from "../validators/claude.schema";
-import { convertClaudeToOpenAI, convertOpenAIToClaude, StreamConverter } from "../utils/claudeConverter";
+import { eq, and, like } from "drizzle-orm";
+import { users } from "../db/schema";
+import { ClaudeRequestSchema } from "@common/validators/claude.schema";
 import { decryptApiKey } from "../utils/encryption";
+import { convertClaudeToOpenAI, convertOpenAIToClaude, StreamConverter } from "../utils/claudeConverter";
+import { ModelMappingService } from "../services/modelMappingService";
 import type { Bindings } from "../types";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
 import * as drizzleSchema from "../db/schema";
 
 type Variables = {
   db: DrizzleD1Database<typeof drizzleSchema>;
-  user?: typeof users.$inferSelect;
 };
 
 const claude = new OpenAPIHono<{ Bindings: Bindings; Variables: Variables }>();
@@ -34,7 +34,12 @@ const messagesRoute = createRoute({
     200: {
       content: {
         "application/json": {
-          schema: ClaudeResponseSchema,
+          schema: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+            },
+          },
         },
         "text/event-stream": {
           schema: {
@@ -106,134 +111,91 @@ const messagesRoute = createRoute({
 });
 
 claude.openapi(messagesRoute, async (c) => {
-  try {
-    const claudeRequest = c.req.valid("json");
-    const user = c.get("user");
-    const db = c.get("db");
+  const db = c.get("db");
+  const apiKey = c.req.header("x-api-key");
+  const claudeRequest = c.req.valid("json");
 
-    if (!user) {
-      return c.json(
-        {
-          error: {
-            type: "authentication_error",
-            message: "Invalid API key",
-          },
-        },
-        401,
-      );
-    }
+  if (!apiKey) {
+    return c.json({ success: false, message: "Missing x-api-key header" }, 401);
+  }
 
-    // 1. 根据模型名称查找匹配的映射规则
-    const mappingRules = await db
-      .select({
-        mapping: modelMappings,
-        provider: apiProviders,
-      })
-      .from(modelMappings)
-      .innerJoin(apiProviders, eq(modelMappings.providerId, apiProviders.id))
-      .where(and(eq(modelMappings.userId, user.id), eq(modelMappings.isEnabled, true)))
-      .orderBy(asc(modelMappings.priority))
-      .all();
+  // 1. Authenticate user
+  const user = await db.query.users.findFirst({ where: eq(users.apiKey, apiKey) });
+  if (!user) {
+    return c.json({ success: false, message: "Invalid API Key" }, 401);
+  }
 
-    // 查找匹配的规则
-    let selectedProvider: typeof apiProviders.$inferSelect | null = null;
-    let targetModel = claudeRequest.model;
+  // 2. Find target model using the new mapping service
+  const modelKeyword = claudeRequest.model;
+  const mappingService = new ModelMappingService(db);
+  const targetModel = await mappingService.findTargetModel(user.id, modelKeyword);
 
-    for (const rule of mappingRules) {
-      if (claudeRequest.model.toLowerCase().includes(rule.mapping.keyword.toLowerCase())) {
-        selectedProvider = rule.provider;
-        targetModel = rule.mapping.targetModel;
-        break;
-      }
-    }
+  // 检查是否成功映射到了不同的模型
+  if (targetModel === modelKeyword) {
+    return c.json(
+      {
+        success: false,
+        message: `No model mapping found for: ${modelKeyword}. Only haiku, sonnet, and opus are supported.`,
+      },
+      400,
+    );
+  }
 
-    // 如果没有找到匹配规则，使用默认提供商
-    if (!selectedProvider) {
-      const defaultProvider = await db
-        .select()
-        .from(apiProviders)
-        .where(and(eq(apiProviders.userId, user.id), eq(apiProviders.isDefault, true)))
-        .get();
+  // 3. Get provider details from the user or use defaults
+  if (!user.encryptedProviderApiKey) {
+    return c.json({ success: false, message: "User has not configured an API key" }, 400);
+  }
 
-      if (!defaultProvider) {
-        return c.json(
-          {
-            error: {
-              type: "invalid_request_error",
-              message: "No API provider configured. Please configure at least one API provider in your settings.",
-            },
-          },
-          400,
-        );
-      }
+  const defaultApiConfig = mappingService.getDefaultApiConfig();
+  const baseUrl = defaultApiConfig.baseUrl; // 始终使用默认baseUrl
+  const targetApiKey = await decryptApiKey(user.encryptedProviderApiKey, c.env.ENCRYPTION_KEY);
 
-      selectedProvider = defaultProvider;
-    }
+  // 4. Convert and forward request
+  const openAIRequest = convertClaudeToOpenAI(claudeRequest, targetModel);
 
-    // 2. 解密 API 密钥
-    const decryptedApiKey = await decryptApiKey(selectedProvider.apiKey, c.env.ENCRYPTION_KEY);
+  const targetUrl = new URL(baseUrl);
+  targetUrl.pathname = "/v1/chat/completions";
 
-    // 3. 转换请求格式
-    const openAIRequest = convertClaudeToOpenAI(claudeRequest, targetModel);
-
-    // 4. 发送请求到目标 API
-    const headers = {
+  const res = await fetch(targetUrl.toString(), {
+    method: "POST",
+    headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${decryptedApiKey}`,
-      "User-Agent": "Claude-Proxy/1.0",
-    };
+      Authorization: `Bearer ${targetApiKey}`,
+    },
+    body: JSON.stringify(openAIRequest),
+  });
 
-    const requestBody = JSON.stringify(openAIRequest);
+  if (!res.ok) {
+    const errorText = await res.text();
+    let errorMessage = "API request failed";
 
-    const response = await fetch(`${selectedProvider.baseUrl}/v1/chat/completions`, {
-      method: "POST",
-      headers,
-      body: requestBody,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorMessage = "API request failed";
-
-      try {
-        const errorData = JSON.parse(errorText);
-        errorMessage = errorData.error?.message || errorMessage;
-      } catch {
-        errorMessage = errorText || errorMessage;
-      }
-
-      return c.json(
-        {
-          error: {
-            type: "api_error",
-            message: `Upstream API error: ${errorMessage}`,
-          },
-        },
-        response.status as any,
-      );
+    try {
+      const errorData = JSON.parse(errorText);
+      errorMessage = errorData.error?.message || errorMessage;
+    } catch {
+      errorMessage = errorText || errorMessage;
     }
 
-    // 5. 处理响应
-    if (claudeRequest.stream) {
-      // 流式响应处理
-      return handleStreamingResponse(c, response, claudeRequest.model);
-    } else {
-      // 非流式响应处理
-      const openAIResponse = await response.json();
-      const claudeResponse = convertOpenAIToClaude(openAIResponse, claudeRequest.model);
-      return c.json(claudeResponse);
-    }
-  } catch (error) {
-    console.error("Claude API 代理错误:", error);
     return c.json(
       {
         error: {
-          type: "internal_server_error",
-          message: "An internal error occurred while processing your request.",
+          type: "api_error",
+          message: `Upstream API error: ${errorMessage}`,
         },
       },
-      500,
+      res.status as any,
     );
+  }
+
+  // 5. Handle response
+  if (claudeRequest.stream) {
+    // Stream response handling
+    return handleStreamingResponse(c, res, claudeRequest.model);
+  } else {
+    // Non-streaming response handling
+    const openAIResponse = await res.json();
+    const claudeResponse = convertOpenAIToClaude(openAIResponse, claudeRequest.model);
+    return c.json(claudeResponse);
   }
 });
 
@@ -250,7 +212,7 @@ async function handleStreamingResponse(c: any, upstreamResponse: Response, origi
         try {
           const converter = new StreamConverter(undefined, originalModel);
 
-          // 发送初始事件
+          // Send initial events
           const initialEvents = converter.generateInitialEvents();
           for (const event of initialEvents) {
             controller.enqueue(encoder.encode(event));
@@ -271,7 +233,7 @@ async function handleStreamingResponse(c: any, upstreamResponse: Response, origi
 
             buffer += decoder.decode(value, { stream: true });
             const lines = buffer.split("\n");
-            buffer = lines.pop() || ""; // 保留不完整的行
+            buffer = lines.pop() || ""; // Keep incomplete lines
 
             for (const line of lines) {
               if (line.trim() === "") continue;
@@ -279,7 +241,7 @@ async function handleStreamingResponse(c: any, upstreamResponse: Response, origi
                 const data = line.slice(6);
 
                 if (data === "[DONE]") {
-                  // 生成结束事件
+                  // Generate finish events
                   const finishEvents = converter.generateFinishEvents(finishReason);
                   for (const event of finishEvents) {
                     controller.enqueue(encoder.encode(event));
@@ -291,12 +253,12 @@ async function handleStreamingResponse(c: any, upstreamResponse: Response, origi
                 try {
                   const chunk = JSON.parse(data);
 
-                  // 记录结束原因
+                  // Record finish reason
                   if (chunk.choices?.[0]?.finish_reason) {
                     finishReason = chunk.choices[0].finish_reason;
                   }
 
-                  // 转换并发送事件
+                  // Convert and send events
                   const events = converter.processOpenAIChunk(chunk);
                   for (const event of events) {
                     controller.enqueue(encoder.encode(event));
@@ -308,7 +270,7 @@ async function handleStreamingResponse(c: any, upstreamResponse: Response, origi
             }
           }
 
-          // 如果流结束但没有收到 [DONE]，手动发送结束事件
+          // If stream ends without receiving [DONE], manually send finish events
           const finishEvents = converter.generateFinishEvents(finishReason);
           for (const event of finishEvents) {
             controller.enqueue(encoder.encode(event));
@@ -317,7 +279,7 @@ async function handleStreamingResponse(c: any, upstreamResponse: Response, origi
         } catch (error) {
           console.error("流式响应处理错误:", error);
 
-          // 发送错误事件
+          // Send error event
           const errorEvent = `event: error\ndata: ${JSON.stringify({
             type: "error",
             error: {

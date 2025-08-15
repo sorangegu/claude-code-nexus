@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 // 类型定义
 interface User {
@@ -71,10 +71,28 @@ const authApi = {
   },
 };
 
+// 封装 fetch 并添加认证头
+export const fetchWithAuth = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  const token = localStorage.getItem("auth_token");
+  const headers = new Headers(init?.headers);
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const newInit: RequestInit = {
+    ...init,
+    headers,
+  };
+
+  return fetch(input, newInit);
+};
+
 // 自定义 Hook
 export function useAuth() {
   const queryClient = useQueryClient();
   const [isInitialized, setIsInitialized] = useState(false);
+  const [hasToken, setHasToken] = useState(() => !!localStorage.getItem("auth_token"));
 
   // 查询当前用户
   const {
@@ -85,8 +103,11 @@ export function useAuth() {
   } = useQuery({
     queryKey: ["auth", "user"],
     queryFn: authApi.getCurrentUser,
-    enabled: !!localStorage.getItem("auth_token"),
+    enabled: hasToken,
     retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   });
 
   // 获取登录 URL
@@ -102,51 +123,17 @@ export function useAuth() {
   const logoutMutation = useMutation({
     mutationFn: authApi.logout,
     onSuccess: () => {
+      localStorage.removeItem("auth_token");
+      setHasToken(false);
       queryClient.clear();
       window.location.href = "/";
     },
   });
 
-  // 处理 OAuth 回调
-  const handleOAuthCallback = async (code: string, state: string) => {
-    try {
-      const response = await fetch(`/api/auth/github/callback?code=${code}&state=${state}`);
-      const data: AuthResponse = await response.json();
-
-      if (data.success && data.data) {
-        localStorage.setItem("auth_token", data.data.sessionToken);
-        queryClient.setQueryData(["auth", "user"], data.data.user);
-        return data.data.user;
-      } else {
-        throw new Error(data.message);
-      }
-    } catch (error) {
-      console.error("OAuth callback error:", error);
-      throw error;
-    }
-  };
-
-  // 检查 URL 中的 OAuth 回调参数
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get("code");
-    const state = urlParams.get("state");
-
-    if (code && state && !isInitialized) {
-      setIsInitialized(true);
-      handleOAuthCallback(code, state)
-        .then(() => {
-          // 清除 URL 参数
-          window.history.replaceState({}, document.title, window.location.pathname);
-        })
-        .catch((error) => {
-          console.error("OAuth处理失败:", error);
-          // 可以显示错误通知
-        });
-    } else if (!isInitialized) {
-      setIsInitialized(true);
-    }
-  }, [isInitialized]);
+    setHasToken(!!localStorage.getItem("auth_token"));
+    setIsInitialized(true);
+  }, []);
 
   // 登录函数
   const login = () => {
@@ -158,8 +145,17 @@ export function useAuth() {
     logoutMutation.mutate();
   };
 
-  // 检查是否已登录
-  const isAuthenticated = !!user && !!localStorage.getItem("auth_token");
+  // 检查是否已登录 - 使用 useMemo 稳定引用
+  const isAuthenticated = useMemo(() => !!user && hasToken, [user, hasToken]);
+
+  // 调试日志
+  console.log("useAuth 状态:", {
+    user: user ? `${user.username} (${user.id})` : null,
+    hasToken,
+    isAuthenticated,
+    isLoading,
+    isInitialized,
+  });
 
   return {
     user,

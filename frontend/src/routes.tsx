@@ -1,12 +1,11 @@
 import { Route, Routes } from "react-router-dom";
 import App from "./App";
 import HomePage from "./pages/HomePage";
-import { Features } from "./pages/Features";
 import { DashboardPage } from "./pages/DashboardPage";
-import { SettingsPage } from "./pages/SettingsPage";
+import { AuthCallbackPage } from "./pages/AuthCallbackPage";
 
 /**
- * 应用路由配置
+ * 路由配置
  *
  * 这是唯一的路由定义文件，被客户端和服务端入口共享使用。
  * 添加新路由时，只需要在这里修改即可。
@@ -20,9 +19,8 @@ export const AppRoutes = () => (
   <Routes>
     <Route path="/" element={<App />}>
       <Route index element={<HomePage />} />
-      <Route path="features" element={<Features />} />
       <Route path="dashboard" element={<DashboardPage />} />
-      <Route path="settings" element={<SettingsPage />} />
+      <Route path="auth/callback" element={<AuthCallbackPage />} />
       {/* 在这里添加新的路由 */}
     </Route>
   </Routes>
