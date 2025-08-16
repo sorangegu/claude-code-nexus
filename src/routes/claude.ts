@@ -164,6 +164,26 @@ claude.openapi(messagesRoute, async (c: any) => {
   const mappingService = new ModelMappingService(db);
   const targetModel = await mappingService.findTargetModel(user.id, modelKeyword);
 
+  // 检查是否成功映射到了不同的模型
+  if (targetModel === modelKeyword) {
+    return c.json(
+      {
+        success: false,
+        message: `No model mapping found for: ${modelKeyword}. Only haiku, sonnet, and opus are supported.`,
+      },
+      400,
+    );
+  }
+
+  // 3. Get provider details from the user or use defaults
+  if (!user.encryptedProviderApiKey) {
+    return c.json({ success: false, message: "User has not configured an API key" }, 400);
+  }
+
+  const defaultApiConfig = mappingService.getDefaultApiConfig();
+  const baseUrl = user.providerBaseUrl || defaultApiConfig.baseUrl; // Use user's baseUrl if available
+  const targetApiKey = await decryptApiKey(user.encryptedProviderApiKey, c.env.ENCRYPTION_KEY);
+
   // 📋 关键信息日志
   const keyPrefix = userApiKey.substring(0, 8);
   const keySuffix = userApiKey.substring(userApiKey.length - 8);
@@ -185,28 +205,8 @@ claude.openapi(messagesRoute, async (c: any) => {
   }, 0);
 
   console.log(
-    `🔑 用户: ${user.username} | Key: ${keyPrefix}...${keySuffix} | 模型: ${modelKeyword} → ${targetModel} | 输入: ${inputLength} 字符`,
+    `🔑 用户: ${user.username} | Key: ${keyPrefix}...${keySuffix} | 模型: ${modelKeyword} → ${targetModel} | 转发至: ${baseUrl} | 输入: ${inputLength} 字符`,
   );
-
-  // 检查是否成功映射到了不同的模型
-  if (targetModel === modelKeyword) {
-    return c.json(
-      {
-        success: false,
-        message: `No model mapping found for: ${modelKeyword}. Only haiku, sonnet, and opus are supported.`,
-      },
-      400,
-    );
-  }
-
-  // 3. Get provider details from the user or use defaults
-  if (!user.encryptedProviderApiKey) {
-    return c.json({ success: false, message: "User has not configured an API key" }, 400);
-  }
-
-  const defaultApiConfig = mappingService.getDefaultApiConfig();
-  const baseUrl = user.providerBaseUrl || defaultApiConfig.baseUrl; // Use user's baseUrl if available
-  const targetApiKey = await decryptApiKey(user.encryptedProviderApiKey, c.env.ENCRYPTION_KEY);
 
   // 4. Convert and forward request
   const openAIRequest = convertClaudeToOpenAI(claudeRequest, targetModel);
@@ -224,25 +224,9 @@ claude.openapi(messagesRoute, async (c: any) => {
   });
 
   if (!res.ok) {
-    const errorText = await res.text();
-    let errorMessage = "API request failed";
-
-    try {
-      const errorData = JSON.parse(errorText);
-      errorMessage = errorData.error?.message || errorMessage;
-    } catch {
-      errorMessage = errorText || errorMessage;
-    }
-
-    return c.json(
-      {
-        error: {
-          type: "api_error",
-          message: `Upstream API error: ${errorMessage}`,
-        },
-      },
-      res.status as any,
-    );
+    // 当上游API请求失败时，直接将上游的响应返回给客户端
+    console.error(`上游API请求失败: ${res.status} ${res.statusText}`, `请求地址: ${targetUrl}`);
+    return c.newResponse(res.body, res.status, res.headers);
   }
 
   // 5. Handle response

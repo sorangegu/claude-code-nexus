@@ -388,7 +388,13 @@ export function DashboardPage() {
                 <Autocomplete
                   options={PRESET_API_PROVIDERS}
                   getOptionLabel={(option) => (typeof option === "string" ? option : option.name)}
-                  value={baseUrl}
+                  value={PRESET_API_PROVIDERS.find((p) => p.baseUrl === baseUrl) || baseUrl}
+                  onInputChange={(event, newInputValue) => {
+                    // event.type === 'change' 表示用户正在输入
+                    if (event && event.type === "change") {
+                      setBaseUrl(newInputValue);
+                    }
+                  }}
                   onChange={(event, newValue) => {
                     if (typeof newValue === "string") {
                       setBaseUrl(newValue);
@@ -478,7 +484,7 @@ export function DashboardPage() {
                 {modelFetchError}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                请检查API Key、Base URL是否正确，或稍后重试
+                请注意，并非所有API供应商都实现了模型列表接口。如果确认信息无误仍无法拉取模型列表可手动在下方填写目标模型名称。
               </Typography>
             </Alert>
           )}
@@ -606,9 +612,9 @@ export function DashboardPage() {
           })}
 
           <Box sx={{ mt: 4, display: "flex", justifyContent: "flex-end", gap: 2 }}>
-            <Button onClick={resetToSystemMapping} startIcon={<RefreshIcon />} variant="outlined">
+            {/* <Button onClick={resetToSystemMapping} startIcon={<RefreshIcon />} variant="outlined">
               重置到系统默认
-            </Button>
+            </Button> */}
             <Button onClick={handleSave} variant="contained" size="large" startIcon={<SaveIcon />} disabled={isSaving}>
               {isSaving ? "保存中..." : "保存配置"}
             </Button>
