@@ -40,7 +40,7 @@ app
 
     return c.json({
       provider: {
-        baseUrl: defaultApiConfig.baseUrl,
+        baseUrl: user.providerBaseUrl || defaultApiConfig.baseUrl,
         apiKey: providerApiKey || "",
       },
       modelConfig,
@@ -52,14 +52,26 @@ app
     const mappingService = new ModelMappingService(db);
     const { provider, modelConfig } = await c.req.json();
 
-    if (provider && provider.apiKey) {
-      await db
-        .update(users)
-        .set({
-          encryptedProviderApiKey: await encryptApiKey(provider.apiKey, c.env.ENCRYPTION_KEY),
-          updatedAt: new Date(),
-        })
-        .where(eq(users.id, user.id));
+    if (provider) {
+      const updateData: {
+        encryptedProviderApiKey?: string;
+        providerBaseUrl?: string;
+        updatedAt: Date;
+      } = {
+        updatedAt: new Date(),
+      };
+
+      if (provider.apiKey) {
+        updateData.encryptedProviderApiKey = await encryptApiKey(
+          provider.apiKey,
+          c.env.ENCRYPTION_KEY,
+        );
+      }
+      if (provider.baseUrl) {
+        updateData.providerBaseUrl = provider.baseUrl;
+      }
+
+      await db.update(users).set(updateData).where(eq(users.id, user.id));
     }
 
     if (modelConfig) {
@@ -76,7 +88,7 @@ app
 
     return c.json({
       provider: {
-        baseUrl: defaultApiConfig.baseUrl,
+        baseUrl: updatedUser?.providerBaseUrl || defaultApiConfig.baseUrl,
         apiKey: decryptedApiKey || "",
       },
       modelConfig: updatedModelConfig,

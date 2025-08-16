@@ -33,6 +33,7 @@ export const users = sqliteTable(
       .unique()
       .$defaultFn(() => `ak-${createId()}`),
     encryptedProviderApiKey: text("encrypted_provider_api_key"),
+    providerBaseUrl: text("provider_base_url"),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(strftime('%s', 'now'))`),

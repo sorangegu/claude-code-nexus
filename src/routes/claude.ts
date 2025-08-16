@@ -205,7 +205,7 @@ claude.openapi(messagesRoute, async (c: any) => {
   }
 
   const defaultApiConfig = mappingService.getDefaultApiConfig();
-  const baseUrl = defaultApiConfig.baseUrl; // 始终使用默认baseUrl
+  const baseUrl = user.providerBaseUrl || defaultApiConfig.baseUrl; // Use user's baseUrl if available
   const targetApiKey = await decryptApiKey(user.encryptedProviderApiKey, c.env.ENCRYPTION_KEY);
 
   // 4. Convert and forward request

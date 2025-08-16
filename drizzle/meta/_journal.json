@@ -15,6 +15,13 @@
       "when": 1755261724552,
       "tag": "0001_brainy_stranger",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1755347396798,
+      "tag": "0002_grey_captain_midlands",
+      "breakpoints": true
     }
   ]
 }
