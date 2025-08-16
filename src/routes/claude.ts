@@ -211,10 +211,10 @@ claude.openapi(messagesRoute, async (c: any) => {
   // 4. Convert and forward request
   const openAIRequest = convertClaudeToOpenAI(claudeRequest, targetModel);
 
-  const targetUrl = new URL(baseUrl);
-  targetUrl.pathname = "/v1/chat/completions";
+  // 修正：严格以用户提供的baseUrl为基准，直接拼接路径
+  const targetUrl = baseUrl.endsWith("/") ? `${baseUrl}chat/completions` : `${baseUrl}/chat/completions`;
 
-  const res = await fetch(targetUrl.toString(), {
+  const res = await fetch(targetUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

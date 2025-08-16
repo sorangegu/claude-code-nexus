@@ -186,8 +186,11 @@ export function DashboardPage() {
     setIsFetchingModels(true);
     setModelFetchError(null); // 清除之前的错误
 
+    // 修正：直接使用用户提供的baseUrl，在后面加上/models
+    const modelsUrl = baseUrl.endsWith("/") ? `${baseUrl}models` : `${baseUrl}/models`;
+
     try {
-      const response = await fetch(new URL("/v1/models", baseUrl), {
+      const response = await fetch(modelsUrl, {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
@@ -215,6 +218,7 @@ export function DashboardPage() {
           // 如果无法解析错误响应，使用状态文本
           errorMessage += `: ${response.statusText}`;
         }
+        errorMessage += `<br/>请求地址: ${modelsUrl}`;
         setModelFetchError(errorMessage);
         setModels([]);
       }
@@ -226,6 +230,7 @@ export function DashboardPage() {
       } else if (error instanceof Error) {
         errorMessage = `获取模型列表失败: ${error.message}`;
       }
+      errorMessage += `<br/>请求地址: ${modelsUrl}`;
       setModelFetchError(errorMessage);
       setModels([]);
     } finally {
