@@ -188,9 +188,9 @@ export function DashboardPage() {
       const savedMapping = restoreCustomMappingFromStorage();
       const currentMapping = modelConfig.customMapping;
       const defaultMapping = {
-        haiku: "gpt-4o-mini",
-        sonnet: "gpt-4o",
-        opus: "gpt-4o",
+        haiku: "gemini-2.5-flash-nothinking",
+        sonnet: "gemini-2.5-pro",
+        opus: "gemini-2.5-pro",
       };
 
       setModelConfig({
