@@ -80,3 +80,7 @@ claude "用 Rust 写一个 hello world"
 ## 📄 许可证
 
 本项目基于 [MIT License](./LICENSE) 开源。
+
+## ⭐ Star 趋势
+
+![Star History Chart](https://api.star-history.com/svg?repos=KroMiose/claude-code-nexus&type=Date)

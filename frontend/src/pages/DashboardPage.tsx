@@ -387,7 +387,7 @@ export function DashboardPage() {
               <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
                 <Autocomplete
                   options={PRESET_API_PROVIDERS}
-                  getOptionLabel={(option) => (typeof option === "string" ? option : option.name)}
+                  getOptionLabel={(option) => (typeof option === "string" ? option : option.baseUrl)}
                   value={PRESET_API_PROVIDERS.find((p) => p.baseUrl === baseUrl) || baseUrl}
                   onInputChange={(event, newInputValue) => {
                     // event.type === 'change' 表示用户正在输入
