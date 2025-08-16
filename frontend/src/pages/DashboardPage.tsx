@@ -35,7 +35,11 @@ import {
   UserModelConfigSchema,
   UpdateUserConfigSchema,
 } from "../../../common/validators/config.schema";
-import { PRESET_API_PROVIDERS } from "../../../src/config/defaultModelMappings";
+import {
+  PRESET_API_PROVIDERS,
+  FIXED_MODEL_RULES,
+  DEFAULT_MAPPING_CONFIG,
+} from "../../../src/config/defaultModelMappings";
 
 type ProviderData = z.infer<typeof ProviderConfigSchema>;
 type ModelMappingConfig = z.infer<typeof ModelMappingConfigSchema>;
@@ -187,15 +191,10 @@ export function DashboardPage() {
       // 切换到自定义配置时，优先使用保存的配置，其次使用当前配置，最后使用默认值
       const savedMapping = restoreCustomMappingFromStorage();
       const currentMapping = modelConfig.customMapping;
-      const defaultMapping = {
-        haiku: "gemini-2.5-flash-nothinking",
-        sonnet: "gemini-2.5-pro",
-        opus: "gemini-2.5-pro",
-      };
 
       setModelConfig({
         useSystemMapping: false,
-        customMapping: savedMapping || currentMapping || defaultMapping,
+        customMapping: savedMapping || currentMapping || DEFAULT_MAPPING_CONFIG,
       });
     }
   };
@@ -249,6 +248,60 @@ export function DashboardPage() {
       console.error("Error resetting mappings:", error);
     }
   };
+
+  // 创建可复用的模型映射行组件
+  const ModelMappingRow = ({
+    modelKey,
+    rule,
+    systemValue,
+    customValue,
+    onCustomChange,
+  }: {
+    modelKey: keyof ModelMappingConfig;
+    rule: { keyword: string; description: string };
+    systemValue: string;
+    customValue: string;
+    onCustomChange: (value: string) => void;
+  }) => (
+    <Grid container spacing={2} sx={{ mb: 2, alignItems: "center" }}>
+      <Grid item xs={12} md={3}>
+        <TextField
+          value={rule.keyword}
+          label="模型类型"
+          fullWidth
+          disabled
+          sx={{
+            "& .MuiInputBase-input.Mui-disabled": {
+              WebkitTextFillColor: theme.palette.text.primary,
+              opacity: 0.7,
+            },
+          }}
+        />
+      </Grid>
+      <Grid item xs={12} md={6}>
+        <Autocomplete
+          options={models.map((m) => m.name)}
+          value={modelConfig.useSystemMapping ? systemValue : customValue}
+          onChange={(event, newValue) => onCustomChange(newValue || "")}
+          disabled={modelConfig.useSystemMapping}
+          freeSolo
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label="目标模型"
+              error={!!errors.modelConfig?.customMapping?.[modelKey]}
+              helperText={errors.modelConfig?.customMapping?.[modelKey]?.[0]}
+            />
+          )}
+        />
+      </Grid>
+      <Grid item xs={12} md={3}>
+        <Typography variant="body2" color="text.secondary">
+          {rule.description}
+        </Typography>
+      </Grid>
+    </Grid>
+  );
 
   if (isAuthLoading || isLoadingConfig) {
     return <CircularProgress />;
@@ -451,125 +504,24 @@ export function DashboardPage() {
             Claude 模型映射配置
           </Typography>
 
-          {/* Haiku 映射 */}
-          <Grid container spacing={2} sx={{ mb: 2, alignItems: "center" }}>
-            <Grid item xs={12} md={3}>
-              <TextField
-                value="haiku"
-                label="模型类型"
-                fullWidth
-                disabled
-                sx={{
-                  "& .MuiInputBase-input.Mui-disabled": {
-                    WebkitTextFillColor: theme.palette.text.primary,
-                    opacity: 0.7,
-                  },
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Autocomplete
-                options={models.map((m) => m.name)}
-                value={modelConfig.useSystemMapping ? "gpt-4o-mini" : modelConfig.customMapping?.haiku || ""}
-                onChange={(event, newValue) => updateCustomMapping("haiku", newValue || "")}
-                disabled={modelConfig.useSystemMapping}
-                freeSolo
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="目标模型"
-                    error={!!errors.modelConfig?.customMapping?.haiku}
-                    helperText={errors.modelConfig?.customMapping?.haiku?.[0]}
-                  />
-                )}
-              />
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <Typography variant="body2" color="text.secondary">
-                轻量级模型，在快速响应和简单任务中使用
-              </Typography>
-            </Grid>
-          </Grid>
+          {/* 使用可复用组件渲染模型映射行 */}
+          {FIXED_MODEL_RULES.map((rule) => {
+            const modelKey = rule.keyword as keyof ModelMappingConfig;
+            const systemValue = DEFAULT_MAPPING_CONFIG[modelKey];
+            const customValue = modelConfig.customMapping?.[modelKey] || "";
 
-          {/* Sonnet 映射 */}
-          <Grid container spacing={2} sx={{ mb: 2, alignItems: "center" }}>
-            <Grid item xs={12} md={3}>
-              <TextField
-                value="sonnet"
-                label="模型类型"
-                fullWidth
-                disabled
-                sx={{
-                  "& .MuiInputBase-input.Mui-disabled": {
-                    WebkitTextFillColor: theme.palette.text.primary,
-                    opacity: 0.7,
-                  },
-                }}
+            return (
+              <ModelMappingRow
+                key={modelKey}
+                modelKey={modelKey}
+                rule={rule}
+                systemValue={systemValue}
+                customValue={customValue}
+                onCustomChange={(value) => updateCustomMapping(modelKey, value)}
               />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Autocomplete
-                options={models.map((m) => m.name)}
-                value={modelConfig.useSystemMapping ? "gpt-4o" : modelConfig.customMapping?.sonnet || ""}
-                onChange={(event, newValue) => updateCustomMapping("sonnet", newValue || "")}
-                disabled={modelConfig.useSystemMapping}
-                freeSolo
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="目标模型"
-                    error={!!errors.modelConfig?.customMapping?.sonnet}
-                    helperText={errors.modelConfig?.customMapping?.sonnet?.[0]}
-                  />
-                )}
-              />
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <Typography variant="body2" color="text.secondary">
-                平衡性能的通用模型，在大多数场景中使用
-              </Typography>
-            </Grid>
-          </Grid>
+            );
+          })}
 
-          {/* Opus 映射 */}
-          <Grid container spacing={2} sx={{ mb: 2, alignItems: "center" }}>
-            <Grid item xs={12} md={3}>
-              <TextField
-                value="opus"
-                label="模型类型"
-                fullWidth
-                disabled
-                sx={{
-                  "& .MuiInputBase-input.Mui-disabled": {
-                    WebkitTextFillColor: theme.palette.text.primary,
-                    opacity: 0.7,
-                  },
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Autocomplete
-                options={models.map((m) => m.name)}
-                value={modelConfig.useSystemMapping ? "gpt-4o" : modelConfig.customMapping?.opus || ""}
-                onChange={(event, newValue) => updateCustomMapping("opus", newValue || "")}
-                disabled={modelConfig.useSystemMapping}
-                freeSolo
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="目标模型"
-                    error={!!errors.modelConfig?.customMapping?.opus}
-                    helperText={errors.modelConfig?.customMapping?.opus?.[0]}
-                  />
-                )}
-              />
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <Typography variant="body2" color="text.secondary">
-                高性能模型，在复杂推理编码任务中使用
-              </Typography>
-            </Grid>
-          </Grid>
           <Box sx={{ mt: 4, display: "flex", justifyContent: "flex-end", gap: 2 }}>
             <Button onClick={resetToSystemMapping} startIcon={<RefreshIcon />} variant="outlined">
               重置到系统默认
@@ -635,7 +587,7 @@ curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo bash -
 sudo apt-get install -y nodejs
 node --version
 
-# macOS 用户  
+# macOS 用户
 brew install node
 node --version`}</code>
             </Box>
