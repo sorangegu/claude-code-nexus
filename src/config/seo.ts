@@ -38,42 +38,66 @@ export interface SEOConfig {
  */
 export const seoConfig: SEOConfig = {
   // 🌟 基础网站信息（必须修改）
-  siteName: "NekroEdge",
-  siteUrl: "https://edge.nekro.ai",
-  title: "NekroEdge - 现代化全栈应用模板",
+  siteName: "Claude Code Nexus",
+  siteUrl: "https://claude.nekro.ai",
+  title: "Claude Code Nexus - 自由切换后端的 Claude Code CLI 代理平台",
   description:
-    "基于 Cloudflare 技术栈的生产级全栈应用模板，使用 Hono + React + D1 技术栈，提供开箱即用的开发体验和端到端类型安全。支持服务器端渲染、自动API文档生成。",
+    "一个开源的 Claude API 代理服务平台，让您的 Claude Code CLI 无缝兼容任何 OpenAI API 服务，如 OneAPI、Azure OpenAI 或本地 Ollama。提供多用户隔离、图形化配置和开源自部署能力。",
   keywords: [
-    "全栈开发",
+    "Claude Code",
+    "Claude API",
+    "OpenAI",
+    "API Proxy",
+    "API Gateway",
+    "OneAPI",
+    "Ollama",
+    "Anthropic",
     "Cloudflare",
     "Hono",
     "React",
-    "TypeScript",
-    "无服务器",
-    "边缘计算",
-    "D1数据库",
-    "SSR",
-    "开发模板",
+    "开源",
+    // 兼容模型供应商
+    "Gemini",
+    "通义千问",
+    "Qwen",
+    "豆包",
+    "Kimi",
+    "Moonshot AI",
+    "智谱清言",
+    "Zhipu AI",
+    "ChatGLM",
+    "百度千帆",
+    "Baidu Qianfan",
+    "科大讯飞",
+    "Spark",
+    "百川",
+    "Baichuan",
+    "腾讯混元",
+    "Hunyuan",
+    "商汤日日新",
+    "SenseNova",
   ],
-  author: "NekroEdge Team",
+  author: "Claude Code Nexus Team",
   language: "zh-CN",
 
   // 🎨 社交媒体和品牌
-  ogImage: "/og-image.png",
-  themeColor: "#8A2BE2",
+  ogImage: "/og-image.png", // 建议在 public 目录下创建一个 og-image.png
+  themeColor: "#4A90E2", // Claude-like blue color
 
   // 📄 页面级配置
   pages: {
     "/": {
-      title: "NekroEdge - 现代化全栈应用模板 | Cloudflare + Hono + React",
-      changefreq: "weekly",
+      title: "Claude Code Nexus - 首页 | 兼容 OpenAI 的 Claude API 代理",
+      description:
+        "了解如何使用 Claude Code Nexus 将您的 Claude Code CLI 连接到任何 OpenAI 兼容的 API 服务，实现模型自由、降低成本。",
+      changefreq: "monthly",
       priority: 1.0,
     },
-    "/features": {
-      title: "功能演示 - NekroEdge 全栈模板",
-      description: "体验 NekroEdge 模板的核心功能：端到端类型安全、服务器端渲染、自动API文档生成等现代化开发特性。",
-      changefreq: "monthly",
-      priority: 0.8,
+    "/dashboard": {
+      title: "控制台 - Claude Code Nexus",
+      description: "管理您的 API Key、配置后端 OpenAI 服务地址、自定义模型映射规则。",
+      changefreq: "yearly",
+      priority: 0.5,
     },
   },
 };
