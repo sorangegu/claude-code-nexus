@@ -62,8 +62,17 @@ class ClaudeStreamConverter {
     if (!delta) return events;
 
     if (delta.content) {
-      if (this.contentBlockIndex === -1) {
-        this.contentBlockIndex = 0;
+      if (
+        this.contentBlockIndex === -1 ||
+        this.toolCallStates[Object.keys(this.toolCallStates)[this.contentBlockIndex]]
+      ) {
+        // 如果当前是工具块，或者还没有块，则开始新的文本块
+        if (this.contentBlockIndex !== -1) {
+          events.push(
+            this.formatEvent("content_block_stop", { type: "content_block_stop", index: this.contentBlockIndex }),
+          );
+        }
+        this.contentBlockIndex++;
         events.push(
           this.formatEvent("content_block_start", {
             type: "content_block_start",
@@ -83,8 +92,12 @@ class ClaudeStreamConverter {
 
     if (delta.tool_calls) {
       for (const toolCallDelta of delta.tool_calls) {
-        if (toolCallDelta.index > this.contentBlockIndex) {
-          if (this.contentBlockIndex !== -1 && !this.toolCallStates[this.contentBlockIndex]) {
+        if (
+          toolCallDelta.index > this.contentBlockIndex ||
+          (this.contentBlockIndex !== -1 &&
+            !this.toolCallStates[Object.keys(this.toolCallStates)[this.contentBlockIndex]])
+        ) {
+          if (this.contentBlockIndex !== -1) {
             events.push(
               this.formatEvent("content_block_stop", { type: "content_block_stop", index: this.contentBlockIndex }),
             );
@@ -161,7 +174,6 @@ claude.use("*", async (c, next) => {
   await next();
 });
 
-// **FIX 1: 将路由定义内联到 openapi() 调用中**
 claude.openapi(
   createRoute({
     method: "post",
@@ -235,11 +247,25 @@ claude.openapi(
       return c.newResponse(res.body, res.status, res.headers);
     }
 
+    const inputLength = claudeRequest.messages.reduce((total: number, msg: any) => {
+      if (typeof msg.content === "string") {
+        return total + msg.content.length;
+      }
+      if (Array.isArray(msg.content)) {
+        return (
+          total +
+          msg.content.reduce((sum: number, block: any) => {
+            if (block.type === "text" && typeof block.text === "string") {
+              return sum + block.text.length;
+            }
+            return sum;
+          }, 0)
+        );
+      }
+      return total;
+    }, 0);
+
     if (claudeRequest.stream) {
-      const inputLength = claudeRequest.messages.reduce(
-        (total: number, msg: any) => total + (msg.content?.[0]?.text?.length || 0),
-        0,
-      );
       return handleStreamingResponse(c, res, claudeRequest.model, inputLength, user.username);
     } else {
       const openAIResponse = await res.json();
