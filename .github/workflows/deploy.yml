@@ -5,6 +5,22 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:  # 添加手动触发支持
+    inputs:  # 可选：定义手动触发时的输入参数
+      environment:
+        description: 'Deployment environment'
+        required: false
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+          - development
+      deploy_message:
+        description: 'Deployment message'
+        required: false
+        default: 'Manual deployment'
+        type: string
 
 jobs:
   deploy:
