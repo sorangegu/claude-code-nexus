@@ -6,21 +6,6 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:  # 添加手动触发支持
-    inputs:  # 可选：定义手动触发时的输入参数
-      environment:
-        description: 'Deployment environment'
-        required: false
-        default: 'production'
-        type: choice
-        options:
-          - production
-          - staging
-          - development
-      deploy_message:
-        description: 'Deployment message'
-        required: false
-        default: 'Manual deployment'
-        type: string
 
 jobs:
   deploy:
@@ -47,9 +32,9 @@ jobs:
         run: pnpm build
 
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: your-project-name
-          directory: dist/client
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npm install -g wrangler
+          wrangler pages deploy dist/client --project-name=claude-code-nexus --compatibility-date=2024-07-29 --compatibility_flags=nodejs_compat
