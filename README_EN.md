@@ -11,7 +11,7 @@
 ## ✨ Core Value
 
 - **🔓 Vendor Unlock**: No longer locked to a single AI service provider. You can freely choose the service with the best cost-performance ratio and performance.
-- **🔌 Seamless Compatibility**: 100% compatible with Claude Messages API, including streaming responses (SSE), tool use (Tool Use), and multimodal input.
+- **🔌 Seamless Compatibility**: Compatible with Claude Messages API, including streaming responses (SSE), tool use (Tool Use), and multimodal input.
 - **🎯 Smart Model Mapping**: Easily configure model mapping rules on the web (e.g., map `claude-3-haiku` to `gpt-4o-mini`), with no changes needed in Claude Code CLI.
 - **🔐 Secure & Reliable**: API Keys are encrypted and stored in the database, with strict user data isolation.
 - **🚀 Global Acceleration**: Based on Cloudflare's global network, providing low-latency, high-availability access for your AI applications.
@@ -42,7 +42,7 @@ export ANTHROPIC_API_KEY="ak-your-nexus-key"
 export ANTHROPIC_BASE_URL="https://claude.nekro.ai"
 
 # 3. Use Claude Code normally!
-claude "Write a hello world in Rust"
+claude
 ```
 
 🎉 **Done!** Now your Claude Code CLI is proxied through Claude Code Nexus, using your own backend service.
@@ -80,3 +80,7 @@ Welcome to participate in the project through the following ways:
 ## 📄 License
 
 This project is licensed under the [MIT License](./LICENSE).
+
+## ⭐ Star Trend
+
+![Star History Chart](https://api.star-history.com/svg?repos=KroMiose/claude-code-nexus&type=Date)

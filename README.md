@@ -11,7 +11,7 @@
 ## ✨ 核心价值
 
 - **🔓 供应商解锁**: 不再被锁定在单一的 AI 服务提供商。你可以自由选择性价比最高、性能最好的服务。
-- **🔌 无缝兼容**: 100% 兼容 Claude Messages API，包括流式响应 (SSE)、工具使用 (Tool Use) 和多模态输入。
+- **🔌 无缝兼容**: 兼容 Claude Messages API，包括流式响应 (SSE)、工具使用 (Tool Use) 和多模态输入。
 - **🎯 智能模型映射**: 在网页上轻松配置模型映射规则（例如，将 `claude-3-haiku` 映射到 `gpt-4o-mini`），Claude Code CLI 无需任何改动。
 - **🔐 安全可靠**: API Key 在数据库中加密存储，用户数据严格隔离。
 - **🚀 全球加速**: 基于 Cloudflare 的全球网络，为你的 AI 应用提供低延迟、高可用的访问体验。
@@ -42,7 +42,7 @@ export ANTHROPIC_API_KEY="ak-your-nexus-key"
 export ANTHROPIC_BASE_URL="https://claude.nekro.ai"
 
 # 3. 正常使用 Claude Code！
-claude "用 Rust 写一个 hello world"
+claude
 ```
 
 🎉 **完成！** 现在你的 Claude Code CLI 已经通过 Claude Code Nexus 代理，使用你自己的后端服务了。

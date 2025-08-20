@@ -54,20 +54,6 @@ git clone https://github.com/YOUR_USERNAME/nekro-edge-template.git your-project-
 cd your-project-name
 ```
 
-#### 方式三：直接克隆 (仅用于快速测试)
-
-```bash
-# 仅用于快速测试，不推荐用于正式项目
-git clone https://github.com/KroMiose/nekro-edge-template.git your-project-name
-cd your-project-name
-
-# 如需创建新的 Git 历史
-rm -rf .git
-git init
-git add .
-git commit -m "Initial commit"
-```
-
 ### 2. 安装依赖
 
 ```bash
@@ -155,80 +141,16 @@ DB_DEBUG=true
 }
 ```
 
-### 设置推荐配置
-
-创建 `.vscode/settings.json`：
-
-```json
-{
-  "editor.defaultFormatter": "esbenp.prettier-vscode",
-  "editor.formatOnSave": true,
-  "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true
-  },
-  "typescript.preferences.importModuleSpecifier": "relative"
-}
-```
-
-## 🔍 验证安装完整性
-
-### 运行验证脚本
-
-```bash
-# 检查所有依赖是否正确安装
-pnpm list
-
-# 运行类型检查
-pnpm type-check
-
-# 运行代码格式检查
-pnpm format
-
-# 尝试构建项目
-pnpm build
-```
-
-### 测试热重载功能
-
-1. 确保开发服务器运行中 (`pnpm dev`)
-2. 访问 http://localhost:5173
-3. 编辑 `frontend/src/pages/HomePage.tsx`，修改任意文本
-4. 保存文件，浏览器应该立即更新
-
 ## 🚨 常见安装问题
-
-### Node.js 版本过低
-
-```bash
-# 检查 Node.js 版本
-node --version
-
-# 如果版本 < 18，建议使用 nvm 升级
-nvm install 18
-nvm use 18
-```
-
-### pnpm 命令不存在
-
-```bash
-# 全局安装 pnpm
-npm install -g pnpm
-
-# 或使用 npx
-npx pnpm install
-```
 
 ### 端口冲突
 
 如果 5173 或 8787 端口被占用：
 
 ```bash
-# 方式一：修改 .env 文件中的端口
+# 修改 .env.vars 文件中的端口
 VITE_PORT=3000
 VITE_API_PORT=8000
-
-# 方式二：手动指定端口启动
-pnpm dev --port 3000
 ```
 
 ### 数据库连接失败
