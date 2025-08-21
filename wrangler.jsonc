@@ -31,7 +31,7 @@
         {
           "binding": "DB",
           "database_name": "claude-code-nexus",
-          "database_id": "18df19cb-8329-4911-9c02-fffe47d65c7b",
+          "database_id": "e3d9b1ff-af19-4c52-8298-9a30bc0bc083",
           "migrations_dir": "drizzle"
         }
       ],
